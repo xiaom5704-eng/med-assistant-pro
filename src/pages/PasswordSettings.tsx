@@ -211,7 +211,7 @@ export const PasswordSettings: React.FC = () => {
     }, 500);
   };
 
-  // --- AI 分析邏輯（呼叫後端 API） ---
+  // --- AI 分析邏輯（統叫後端 API） ---
   const runAnalysis = async () => {
     if (medications.length === 0) {
       alert("請先新增至少一種藥物。");
@@ -220,21 +220,28 @@ export const PasswordSettings: React.FC = () => {
     setLoading(true);
     try {
       const medNames = medications.map(m => m.name);
+      console.log('[DEBUG] 開始分析，藥物:', medNames, '年齢組:', ageGroup);
+      
       const response = await fetch('/api/analyze-medication', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ medications: medNames, ageGroup })
       });
       
+      console.log('[DEBUG] API 回應狀态:', response.status, response.statusText);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('[DEBUG] 分析成功:', data);
         setAnalysisResult(data);
       } else {
-        alert('分析失敗，請稍後重試');
+        const errorText = await response.text();
+        console.error('[ERROR] API 錯誤 (', response.status, '):', errorText);
+        alert(`分析失敗 (${response.status}): ${errorText || '未知錯誤'}`);
       }
     } catch (error) {
-      console.error('API 呼叫失敗:', error);
-      alert('無法連接到服務器，請檢查網路連線');
+      console.error('[ERROR] API 統叫失敗:', error);
+      alert(`無法連接到服務器: ${error instanceof Error ? error.message : '未知錯誤'}`);
     } finally {
       setLoading(false);
     }
@@ -245,17 +252,24 @@ export const PasswordSettings: React.FC = () => {
     setLoadingLocations(true);
     try {
       const typeParam = locationFilter === 'all' ? 'all' : locationFilter;
+      console.log('[DEBUG] 查詢醫療地點，類型:', typeParam);
+      
       const response = await fetch(`/api/nearby-medical-locations?type=${typeParam}`);
+      
+      console.log('[DEBUG] 醫療地點 API 回應狀态:', response.status, response.statusText);
       
       if (response.ok) {
         const data = await response.json();
+        console.log('[DEBUG] 查詢成功:', data);
         setMedicalLocations(data.locations);
       } else {
-        alert('查詢失敗，請稍後重試');
+        const errorText = await response.text();
+        console.error('[ERROR] API 錯誤 (', response.status, '):', errorText);
+        alert(`查詢失敗 (${response.status}): ${errorText || '未知錯誤'}`);
       }
     } catch (error) {
-      console.error('查詢失敗:', error);
-      alert('無法連接到服務器，請檢查網路連線');
+      console.error('[ERROR] 查詢失敗:', error);
+      alert(`無法連接到服務器: ${error instanceof Error ? error.message : '未知錯誤'}`);
     } finally {
       setLoadingLocations(false);
     }
