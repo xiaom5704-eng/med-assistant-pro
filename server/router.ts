@@ -269,7 +269,7 @@ router.post('/analyze-medication', (req, res) => {
 
     // 針對嬰兒的特殊風險評估
     if (ageGroup === "infant") {
-      const infantRisks = medDetails.map(d => d.infantRisk);
+      const infantRisks = medDetails.map((d: any) => d.infantRisk);
       if (infantRisks.includes("極高")) {
         riskLevel = "極高";
         summary = "⚠️ 嚴重警告：此藥物組合對嬰兒極度危險，請務必諮詢醫師，嚴禁自行給藥。";
