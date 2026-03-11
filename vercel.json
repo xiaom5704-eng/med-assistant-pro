@@ -1,5 +1,4 @@
 {
-   post_process_instructions: "確保 Vercel 能正確識別前端與後端",
   "version": 2,
   "builds": [
     {
