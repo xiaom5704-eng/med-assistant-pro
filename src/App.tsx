@@ -5,7 +5,7 @@ import { PasswordSettings } from "./pages/PasswordSettings";
 const Home = () => (
   <div className="flex flex-col items-center justify-center h-screen bg-gray-50 text-center">
     <h1 className="text-4xl font-bold text-blue-600 mb-4">用藥助手 Pro</h1>
-    <p className="text-lg text-gray-60 index-6 mb-8">您的智能用藥管家，守護家人健康。</p>
+    <p className="text-lg text-gray-600 mb-8">您的智能用藥管家，守護家人健康。</p>
     <div className="space-x-4">
       <Link to="/password-settings" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
         進入密碼設定
@@ -27,7 +27,7 @@ const App: React.FC = () => {
         </nav>
         <main className="p-4">
           <Routes>
-            < season path="/" element={<Home />} />
+            <Route path="/" element={<Home />} />
             <Route path="/password-settings" element={<PasswordSettings />} />
           </Routes>
         </main>
