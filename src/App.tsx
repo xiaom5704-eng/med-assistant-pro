@@ -2,29 +2,17 @@ import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { 
   Pill, 
-  LayoutDashboard, 
-  Menu, 
-  X, 
   Home as HomeIcon, 
   ShieldCheck, 
-  Activity, 
-  Baby, 
-  History, 
-  LogOut,
-  Settings
+  Menu, 
+  X
 } from "lucide-react";
 import { PasswordSettings } from "./pages/PasswordSettings";
 
-// --- 導覽列 ---
-const Navbar = ({ isLoggedIn, onLogout }: { isLoggedIn: boolean; onLogout: () => void }) => {
+// --- 導覽列 (極簡版：右上角僅留首頁) ---
+const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const location = useLocation();
   const navigate = useNavigate();
-
-  const navLinks = [
-    { name: "首頁", path: "/", icon: <HomeIcon size={18} /> },
-    { name: "功能中心", path: "/password-settings", icon: <LayoutDashboard size={18} /> },
-  ];
 
   return (
     <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
@@ -37,30 +25,13 @@ const Navbar = ({ isLoggedIn, onLogout }: { isLoggedIn: boolean; onLogout: () =>
             <span className="text-lg font-bold text-gray-900">MedAssistant Pro</span>
           </Link>
 
-          <div className="hidden md:flex items-center space-x-6">
-            {navLinks.map((link) => (
-              <Link
-                key={link.name}
-                to={link.path}
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname === link.path ? "text-blue-600" : "text-gray-500 hover:text-blue-600"
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
-            {isLoggedIn ? (
-              <button onClick={onLogout} className="text-sm font-medium text-gray-500 hover:text-red-600 flex items-center gap-1">
-                <LogOut size={16} /> 登出
-              </button>
-            ) : (
-              <button 
-                onClick={() => navigate("/password-settings")}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition"
-              >
-                立即開始
-              </button>
-            )}
+          <div className="hidden md:flex items-center">
+            <Link
+              to="/"
+              className="text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors"
+            >
+              首頁
+            </Link>
           </div>
 
           <div className="md:hidden">
@@ -72,25 +43,14 @@ const Navbar = ({ isLoggedIn, onLogout }: { isLoggedIn: boolean; onLogout: () =>
       </div>
 
       {isOpen && (
-        <div className="md:hidden bg-white border-b border-gray-100 px-4 py-4 space-y-2">
-          {navLinks.map((link) => (
-            <Link
-              key={link.name}
-              to={link.path}
-              onClick={() => setIsOpen(false)}
-              className="block px-4 py-2 text-gray-600 font-medium hover:bg-gray-50 rounded-lg"
-            >
-              {link.name}
-            </Link>
-          ))}
-          {!isLoggedIn && (
-            <button 
-              onClick={() => { navigate("/password-settings"); setIsOpen(false); }}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold mt-2"
-            >
-              立即開始
-            </button>
-          )}
+        <div className="md:hidden bg-white border-b border-gray-100 px-4 py-4">
+          <Link
+            to="/"
+            onClick={() => setIsOpen(false)}
+            className="block px-4 py-2 text-gray-600 font-medium hover:bg-gray-50 rounded-lg"
+          >
+            首頁
+          </Link>
         </div>
       )}
     </nav>
@@ -130,12 +90,10 @@ const Home = () => {
 };
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
   return (
     <Router>
       <div className="min-h-screen bg-white font-sans">
-        <Navbar isLoggedIn={isLoggedIn} onLogout={() => setIsLoggedIn(false)} />
+        <Navbar />
         <main>
           <Routes>
             <Route path="/" element={<Home />} />

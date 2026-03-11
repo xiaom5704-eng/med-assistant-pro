@@ -1,27 +1,27 @@
 import React, { useState, useEffect, useRef } from "react";
-import { PasswordInput } from "../components/PasswordInput";
 import { 
-  Lock, Mail, CheckCircle2, AlertCircle, LayoutDashboard, Pill, Calendar, User, LogOut, 
-  ChevronLeft, Plus, Bell, Settings, Trash2, Edit2, Clock, ShieldCheck, UserPlus, 
-  LogIn, KeyRound, Eye, EyeOff, ChevronRight, Activity, Camera, FileText, Baby, 
-  History, MessageSquare, Search, AlertTriangle, Info, Send, Upload, Image as ImageIcon,
-  Check, X, RefreshCw, MessageCircle
+  Pill, LayoutDashboard, LogOut, Activity, Baby, History, Send, Camera, 
+  Plus, Trash2, AlertTriangle, Check, RefreshCw, MessageCircle, User, LogIn, UserPlus
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 // --- 類型定義 ---
-type Tab = "dashboard" | "ai" | "baby" | "history" | "meds" | "profile";
-type AuthMode = "login" | "register" | "reset";
+type Tab = "dashboard" | "ai" | "baby" | "chat";
 type AgeGroup = "infant" | "adult" | "elderly";
 
-interface Medication {
+interface BabyAdvice {
   id: string;
-  name: string;
+  symptom: string;
+  med: string;
   dosage: string;
-  frequency: string;
-  function: string;
-  risk: string;
-  comments: string[];
+  warning: string;
+}
+
+interface ChatMessage {
+  id: string;
+  role: "user" | "ai";
+  content: string;
+  timestamp: string;
 }
 
 export const PasswordSettings: React.FC = () => {
@@ -31,28 +31,28 @@ export const PasswordSettings: React.FC = () => {
   
   // --- 狀態管理 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [testCode, setTestCode] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
 
   // --- AI 分析狀態 ---
   const [ageGroup, setAgeGroup] = useState<AgeGroup>("adult");
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [ocrText, setOcrText] = useState("");
 
-  // --- 嬰兒用藥狀態 ---
-  const [babySymptom, setBabySymptom] = useState<string | null>(null);
-  const [babyAdvice, setBabyAdvice] = useState<any>(null);
-
-  // --- 藥物資料與評論 ---
-  const [meds, setMeds] = useState<Medication[]>([
-    { id: "1", name: "阿斯匹靈 (Aspirin)", dosage: "100mg", frequency: "每日一次", function: "抗血小板凝集", risk: "胃出血風險", comments: ["效果不錯", "胃部稍微不適"] },
-    { id: "2", name: "普拿疼 (Panadol)", dosage: "500mg", frequency: "需要時服用", function: "解熱鎮痛", risk: "肝損傷風險", comments: ["退燒很快"] }
+  // --- 嬰兒用藥狀態 (實裝新增/刪除) ---
+  const [babyAdvices, setBabyAdvices] = useState<BabyAdvice[]>([
+    { id: "1", symptom: "發燒", med: "乙醯胺酚 (Acetaminophen)", dosage: "10-15mg/kg", warning: "嚴禁使用阿斯匹靈。" },
+    { id: "2", symptom: "咳嗽", med: "生理食鹽水噴霧", dosage: "適量", warning: "兩歲以下不建議使用止咳藥。" }
   ]);
-  const [newComment, setNewComment] = useState("");
-  const [selectedMedId, setSelectedMedId] = useState<string | null>(null);
+  const [showAddBaby, setShowAddBaby] = useState(false);
+  const [newBaby, setNewBaby] = useState({ symptom: "", med: "", dosage: "", warning: "" });
+
+  // --- AI 醫療問答狀態 ---
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    { id: "1", role: "ai", content: "您好！我是您的 AI 醫療助手。請問今天有什麼可以幫您的？", timestamp: new Date().toLocaleTimeString() }
+  ]);
+  const [inputMsg, setInputMsg] = useState("");
 
   // --- 初始化 ---
   useEffect(() => {
@@ -65,73 +65,58 @@ export const PasswordSettings: React.FC = () => {
   }, [location]);
 
   // --- 帳號邏輯 ---
-  const [authData, setAuthData] = useState({ email: "", password: "", confirmPassword: "", code: "" });
-  
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setTimeout(() => {
       setIsLoggedIn(true);
       setLoading(false);
-    }, 800);
-  };
-
-  const handleSendCode = () => {
-    setLoading(true);
-    setTimeout(() => {
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setTestCode(code);
-      setLoading(false);
-      setMessage({ type: "success", text: `測試驗證碼：${code}` });
     }, 500);
   };
 
-  // --- AI 分析邏輯 (針對年齡層) ---
+  // --- AI 分析邏輯 ---
   const runAnalysis = () => {
     setLoading(true);
     setTimeout(() => {
-      let riskLevel = "低";
-      let advice = "請按醫囑服用。";
-      
-      if (ageGroup === "infant") {
-        riskLevel = "極高";
-        advice = "嬰兒器官發育未完全，嚴禁自行給藥，請務必諮詢小兒科醫師。";
-      } else if (ageGroup === "elderly") {
-        riskLevel = "中";
-        advice = "老年人代謝較慢，建議從低劑量開始，並注意藥物交互作用。";
-      }
-
       setAnalysisResult({
         ageGroup: ageGroup === "infant" ? "嬰兒" : ageGroup === "elderly" ? "老年人" : "成年人",
-        riskLevel,
-        advice,
-        interaction: "目前輸入藥物無明顯相衝，但請注意劑量。"
+        risk: ageGroup === "infant" ? "極高" : "低",
+        advice: ageGroup === "infant" ? "嬰兒用藥需極度謹慎，請務必諮詢醫師。" : "請按醫囑服用，注意藥物交互作用。"
       });
-      setLoading(false);
-    }, 1000);
-  };
-
-  // --- 嬰兒用藥邏輯 ---
-  const handleBabySymptom = (symptom: string) => {
-    setBabySymptom(symptom);
-    setLoading(true);
-    setTimeout(() => {
-      const adviceMap: any = {
-        "發燒": { med: "乙醯胺酚 (Acetaminophen)", dosage: "10-15mg/kg", warning: "嚴禁使用阿斯匹靈，以免引起雷氏症候群。" },
-        "咳嗽": { med: "生理食鹽水噴霧", dosage: "適量", warning: "兩歲以下不建議使用非處方止咳藥。" },
-        "腸絞痛": { med: "益生菌", dosage: "每日一次", warning: "請先確認是否為腸套疊等急症。" }
-      };
-      setBabyAdvice(adviceMap[symptom] || { med: "請諮詢醫師", dosage: "無", warning: "不明症狀請勿給藥。" });
       setLoading(false);
     }, 800);
   };
 
-  // --- 評論邏輯 ---
-  const addComment = (id: string) => {
-    if (!newComment.trim()) return;
-    setMeds(meds.map(m => m.id === id ? { ...m, comments: [...m.comments, newComment] } : m));
-    setNewComment("");
-    setSelectedMedId(null);
+  // --- 嬰兒用藥新增/刪除邏輯 ---
+  const addBabyAdvice = () => {
+    if (!newBaby.symptom || !newBaby.med) return;
+    setBabyAdvices([...babyAdvices, { ...newBaby, id: Date.now().toString() }]);
+    setNewBaby({ symptom: "", med: "", dosage: "", warning: "" });
+    setShowAddBaby(false);
+  };
+
+  const deleteBabyAdvice = (id: string) => {
+    setBabyAdvices(babyAdvices.filter(a => a.id !== id));
+  };
+
+  // --- AI 問答邏輯 ---
+  const sendChat = () => {
+    if (!inputMsg.trim()) return;
+    const userMsg: ChatMessage = { id: Date.now().toString(), role: "user", content: inputMsg, timestamp: new Date().toLocaleTimeString() };
+    setChatMessages([...chatMessages, userMsg]);
+    setInputMsg("");
+    
+    setLoading(true);
+    setTimeout(() => {
+      const aiMsg: ChatMessage = { 
+        id: (Date.now() + 1).toString(), 
+        role: "ai", 
+        content: `針對您的問題「${inputMsg}」，建議您先確認藥物包裝上的說明。如果是給嬰兒使用，請務必精確測量體重對應的劑量。若症狀持續，請立即就醫。`, 
+        timestamp: new Date().toLocaleTimeString() 
+      };
+      setChatMessages(prev => [...prev, aiMsg]);
+      setLoading(false);
+    }, 1000);
   };
 
   // --- 渲染內容 ---
@@ -139,114 +124,104 @@ export const PasswordSettings: React.FC = () => {
     switch (activeTab) {
       case "ai":
         return (
-          <div className="p-6 max-w-2xl mx-auto space-y-8">
-            <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Activity className="text-blue-600" /> AI 藥物分析</h3>
+          <div className="p-6 max-w-2xl mx-auto space-y-6">
+            <h3 className="text-xl font-bold flex items-center gap-2"><Activity className="text-blue-600" /> AI 藥物分析</h3>
             <div className="space-y-4">
-              <label className="block text-sm font-bold text-gray-700">選擇年齡層</label>
               <div className="flex gap-2">
                 {(["infant", "adult", "elderly"] as AgeGroup[]).map(a => (
-                  <button key={a} onClick={() => setAgeGroup(a)} className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${ageGroup === a ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-200"}`}>
+                  <button key={a} onClick={() => setAgeGroup(a)} className={`flex-1 py-2 rounded-lg text-xs font-bold border transition ${ageGroup === a ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-200"}`}>
                     {a === "infant" ? "嬰兒" : a === "elderly" ? "老年人" : "成年人"}
                   </button>
                 ))}
               </div>
-            </div>
-            <div className="space-y-4">
-              <label className="block text-sm font-bold text-gray-700">輸入藥物或上傳圖片</label>
               <div className="flex gap-2">
                 <input type="text" className="flex-1 border border-gray-200 rounded-lg px-4 py-2 text-sm" placeholder="輸入藥物名稱..." />
-                <button onClick={() => fileInputRef.current?.click()} className="p-2 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200"><Camera size={20} /></button>
+                <button onClick={() => fileInputRef.current?.click()} className="p-2 bg-gray-100 rounded-lg text-gray-600"><Camera size={20} /></button>
                 <input type="file" ref={fileInputRef} className="hidden" onChange={() => setOcrText("辨識成功：阿斯匹靈")} />
               </div>
               {ocrText && <p className="text-xs text-blue-600 font-bold">{ocrText}</p>}
+              <button onClick={runAnalysis} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition">開始分析</button>
             </div>
-            <button onClick={runAnalysis} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition">開始分析</button>
-            
             {analysisResult && (
-              <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4 animate-in fade-in">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-gray-500">對象：{analysisResult.ageGroup}</span>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${analysisResult.riskLevel === "極高" ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}>風險：{analysisResult.riskLevel}</span>
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-2 animate-in fade-in">
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-gray-500">對象：{analysisResult.ageGroup}</span>
+                  <span className={analysisResult.risk === "極高" ? "text-red-600" : "text-green-600"}>風險：{analysisResult.risk}</span>
                 </div>
                 <p className="text-sm font-bold text-gray-900">{analysisResult.advice}</p>
-                <p className="text-xs text-gray-500">{analysisResult.interaction}</p>
               </div>
             )}
           </div>
         );
       case "baby":
         return (
-          <div className="p-6 max-w-2xl mx-auto space-y-8">
-            <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Baby className="text-pink-600" /> 嬰兒用藥安全</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {["發燒", "咳嗽", "腸絞痛"].map(s => (
-                <button key={s} onClick={() => handleBabySymptom(s)} className={`py-3 rounded-xl text-sm font-bold border transition ${babySymptom === s ? "bg-pink-600 text-white border-pink-600" : "bg-white text-gray-500 border-gray-200"}`}>{s}</button>
-              ))}
+          <div className="p-6 max-w-2xl mx-auto space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-bold flex items-center gap-2"><Baby className="text-pink-600" /> 嬰兒用藥安全</h3>
+              <button onClick={() => setShowAddBaby(!showAddBaby)} className="p-2 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition"><Plus size={20} /></button>
             </div>
-            {loading && <p className="text-center text-pink-600 font-bold animate-pulse">分析中...</p>}
-            {babyAdvice && !loading && (
-              <div className="p-6 bg-pink-50 rounded-2xl border border-pink-100 space-y-4 animate-in fade-in">
-                <div className="font-bold text-pink-900">建議藥物：{babyAdvice.med}</div>
-                <div className="text-sm text-pink-800">建議劑量：{babyAdvice.dosage}</div>
-                <div className="p-3 bg-white rounded-lg text-xs text-red-600 font-bold border border-red-100">⚠️ 禁忌提醒：{babyAdvice.warning}</div>
+            
+            {showAddBaby && (
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3 animate-in slide-in-from-top-2">
+                <input type="text" placeholder="症狀" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={newBaby.symptom} onChange={e => setNewBaby({...newBaby, symptom: e.target.value})} />
+                <input type="text" placeholder="建議藥物" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={newBaby.med} onChange={e => setNewBaby({...newBaby, med: e.target.value})} />
+                <input type="text" placeholder="建議劑量" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={newBaby.dosage} onChange={e => setNewBaby({...newBaby, dosage: e.target.value})} />
+                <input type="text" placeholder="禁忌提醒" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={newBaby.warning} onChange={e => setNewBaby({...newBaby, warning: e.target.value})} />
+                <div className="flex gap-2">
+                  <button onClick={addBabyAdvice} className="flex-1 py-2 bg-pink-600 text-white rounded-lg text-sm font-bold">儲存</button>
+                  <button onClick={() => setShowAddBaby(false)} className="flex-1 py-2 bg-gray-200 text-gray-600 rounded-lg text-sm font-bold">取消</button>
+                </div>
               </div>
             )}
-          </div>
-        );
-      case "meds":
-        return (
-          <div className="p-6 max-w-2xl mx-auto space-y-6">
-            <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Pill className="text-orange-600" /> 藥品管理與評論</h3>
+
             <div className="space-y-4">
-              {meds.map(m => (
-                <div key={m.id} className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-bold text-gray-900">{m.name}</h4>
-                      <p className="text-xs text-gray-400">{m.dosage} • {m.frequency}</p>
-                    </div>
-                    <button onClick={() => setSelectedMedId(m.id)} className="text-blue-600 text-xs font-bold hover:underline">新增評論</button>
-                  </div>
-                  <div className="text-xs text-gray-500">功能：{m.function} | 風險：{m.risk}</div>
-                  <div className="space-y-2">
-                    {m.comments.map((c, i) => (
-                      <div key={i} className="text-xs bg-gray-50 p-2 rounded-lg text-gray-600">💬 {c}</div>
-                    ))}
-                  </div>
-                  {selectedMedId === m.id && (
-                    <div className="flex gap-2 animate-in slide-in-from-top-2">
-                      <input type="text" value={newComment} onChange={(e) => setNewComment(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-1 text-xs" placeholder="輸入評論..." />
-                      <button onClick={() => addComment(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-bold">送出</button>
-                    </div>
-                  )}
+              {babyAdvices.map(a => (
+                <div key={a.id} className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm space-y-2 relative group">
+                  <button onClick={() => deleteBabyAdvice(a.id)} className="absolute top-4 right-4 text-gray-300 hover:text-red-600 transition opacity-0 group-hover:opacity-100"><Trash2 size={16} /></button>
+                  <div className="font-bold text-gray-900">{a.symptom}</div>
+                  <div className="text-xs text-gray-500">藥物：{a.med} | 劑量：{a.dosage}</div>
+                  <div className="text-xs text-red-600 font-bold">⚠️ {a.warning}</div>
                 </div>
               ))}
+            </div>
+          </div>
+        );
+      case "chat":
+        return (
+          <div className="p-6 max-w-2xl mx-auto h-[500px] flex flex-col">
+            <h3 className="text-xl font-bold flex items-center gap-2 mb-6"><MessageCircle className="text-purple-600" /> AI 醫療問答</h3>
+            <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
+              {chatMessages.map(m => (
+                <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[85%] p-3 rounded-xl text-sm font-medium ${m.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"}`}>
+                    {m.content}
+                    <div className="text-[10px] mt-1 opacity-50">{m.timestamp}</div>
+                  </div>
+                </div>
+              ))}
+              {loading && <div className="text-xs text-purple-600 font-bold animate-pulse">AI 正在思考中...</div>}
+            </div>
+            <div className="flex gap-2">
+              <input type="text" className="flex-1 border border-gray-200 rounded-lg px-4 py-2 text-sm" placeholder="詢問醫療問題..." value={inputMsg} onChange={e => setInputMsg(e.target.value)} onKeyPress={e => e.key === "Enter" && sendChat()} />
+              <button onClick={sendChat} className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"><Send size={20} /></button>
             </div>
           </div>
         );
       case "dashboard":
       default:
         return (
-          <div className="p-6 max-w-2xl mx-auto grid grid-cols-2 gap-4">
-            <button onClick={() => setActiveTab("ai")} className="p-6 bg-blue-50 rounded-2xl border border-blue-100 text-left hover:shadow-md transition">
-              <Activity className="text-blue-600 mb-4" />
-              <div className="font-bold text-gray-900">AI 藥物分析</div>
-              <div className="text-xs text-gray-400">年齡層風險判斷</div>
+          <div className="p-6 max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <button onClick={() => setActiveTab("ai")} className="p-6 bg-blue-50 rounded-2xl border border-blue-100 text-center hover:shadow-md transition">
+              <Activity className="text-blue-600 mx-auto mb-2" />
+              <div className="font-bold text-sm">AI 藥物分析</div>
             </button>
-            <button onClick={() => setActiveTab("baby")} className="p-6 bg-pink-50 rounded-2xl border border-pink-100 text-left hover:shadow-md transition">
-              <Baby className="text-pink-600 mb-4" />
-              <div className="font-bold text-gray-900">嬰兒用藥安全</div>
-              <div className="text-xs text-gray-400">症狀與禁忌提醒</div>
+            <button onClick={() => setActiveTab("baby")} className="p-6 bg-pink-50 rounded-2xl border border-pink-100 text-center hover:shadow-md transition">
+              <Baby className="text-pink-600 mx-auto mb-2" />
+              <div className="font-bold text-sm">嬰兒用藥安全</div>
             </button>
-            <button onClick={() => setActiveTab("meds")} className="p-6 bg-orange-50 rounded-2xl border border-orange-100 text-left hover:shadow-md transition">
-              <Pill className="text-orange-600 mb-4" />
-              <div className="font-bold text-gray-900">藥品管理</div>
-              <div className="text-xs text-gray-400">評論與紀錄</div>
-            </button>
-            <button onClick={() => setActiveTab("history")} className="p-6 bg-purple-50 rounded-2xl border border-purple-100 text-left hover:shadow-md transition">
-              <History className="text-purple-600 mb-4" />
-              <div className="font-bold text-gray-900">對話紀錄</div>
-              <div className="text-xs text-gray-400">家長諮詢歷史</div>
+            <button onClick={() => setActiveTab("chat")} className="p-6 bg-purple-50 rounded-2xl border border-purple-100 text-center hover:shadow-md transition">
+              <MessageCircle className="text-purple-600 mx-auto mb-2" />
+              <div className="font-bold text-sm">AI 醫療問答</div>
             </button>
           </div>
         );
@@ -256,8 +231,7 @@ export const PasswordSettings: React.FC = () => {
   if (!isLoggedIn) {
     return (
       <div className="max-w-sm mx-auto mt-20 p-8 bg-white rounded-3xl border border-gray-100 shadow-xl">
-        <h2 className="text-2xl font-bold text-center mb-8">{authMode === "login" ? "登入" : "註冊"}</h2>
-        {message && <div className="mb-4 p-3 bg-green-50 text-green-600 text-xs font-bold rounded-lg">{message.text}</div>}
+        <h2 className="text-xl font-bold text-center mb-8">{authMode === "login" ? "登入" : "註冊"}</h2>
         <form onSubmit={handleAuth} className="space-y-4">
           <input type="email" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm" placeholder="電子信箱" required />
           <input type="password" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm" placeholder="密碼" required />
@@ -272,13 +246,13 @@ export const PasswordSettings: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto mt-8 flex flex-col md:flex-row gap-8 px-4">
-      <div className="w-full md:w-48 space-y-2">
-        {(["dashboard", "ai", "baby", "meds", "history"] as Tab[]).map(t => (
-          <button key={t} onClick={() => setActiveTab(t)} className={`w-full text-left px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === t ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
-            {t === "dashboard" ? "總覽" : t === "ai" ? "AI 分析" : t === "baby" ? "嬰兒安全" : t === "meds" ? "藥品管理" : "對話紀錄"}
+      <div className="w-full md:w-40 space-y-1">
+        {(["dashboard", "ai", "baby", "chat"] as Tab[]).map(t => (
+          <button key={t} onClick={() => setActiveTab(t)} className={`w-full text-left px-4 py-2 rounded-lg text-xs font-bold transition ${activeTab === t ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
+            {t === "dashboard" ? "總覽" : t === "ai" ? "AI 分析" : t === "baby" ? "嬰兒安全" : "AI 問答"}
           </button>
         ))}
-        <button onClick={() => setIsLoggedIn(false)} className="w-full text-left px-4 py-2 text-red-600 text-sm font-bold hover:bg-red-50 rounded-lg mt-4">登出</button>
+        <button onClick={() => setIsLoggedIn(false)} className="w-full text-left px-4 py-2 text-red-600 text-xs font-bold hover:bg-red-50 rounded-lg mt-4">登出</button>
       </div>
       <div className="flex-1 bg-white rounded-3xl border border-gray-100 shadow-sm min-h-[500px]">
         {renderContent()}
