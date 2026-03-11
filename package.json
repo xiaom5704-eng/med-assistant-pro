@@ -24,6 +24,9 @@
   "author": "",
   "license": "ISC",
   "description": "",
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "@tanstack/react-query": "^5.90.21",
     "@trpc/client": "^11.12.0",
