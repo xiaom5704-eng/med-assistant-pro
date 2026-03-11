@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
   Pill, LayoutDashboard, LogOut, Activity, Baby, History, Send, Camera, 
-  Plus, Trash2, AlertTriangle, Check, RefreshCw, MessageCircle, User, LogIn, UserPlus
+  Plus, Trash2, AlertTriangle, Check, RefreshCw, MessageCircle, User, LogIn, UserPlus, X
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -28,6 +28,8 @@ export const PasswordSettings: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // --- 狀態管理 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -39,8 +41,10 @@ export const PasswordSettings: React.FC = () => {
   const [ageGroup, setAgeGroup] = useState<AgeGroup>("adult");
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [ocrText, setOcrText] = useState("");
+  const [showCamera, setShowCamera] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
 
-  // --- 嬰兒用藥狀態 (實裝新增/刪除) ---
+  // --- 嬰兒用藥狀態 ---
   const [babyAdvices, setBabyAdvices] = useState<BabyAdvice[]>([
     { id: "1", symptom: "發燒", med: "乙醯胺酚 (Acetaminophen)", dosage: "10-15mg/kg", warning: "嚴禁使用阿斯匹靈。" },
     { id: "2", symptom: "咳嗽", med: "生理食鹽水噴霧", dosage: "適量", warning: "兩歲以下不建議使用止咳藥。" }
@@ -63,6 +67,60 @@ export const PasswordSettings: React.FC = () => {
       if (tab) setActiveTab(tab);
     }
   }, [location]);
+
+  // --- 相機邏輯 ---
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: "environment" } 
+      });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+      setShowCamera(true);
+    } catch (err) {
+      alert("無法啟動相機，請確認是否已授權權限。");
+      console.error(err);
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setShowCamera(false);
+  };
+
+  const takePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext("2d");
+      if (context) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+        context.drawImage(videoRef.current, 0, 0);
+        stopCamera();
+        setLoading(true);
+        setTimeout(() => {
+          setLoading(false);
+          setOcrText("📸 圖片辨識成功：阿斯匹靈");
+        }, 1000);
+      }
+    }
+  };
+
+  // --- 檔案上傳邏輯 ---
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLoading(true);
+      setTimeout(() => {
+        setLoading(false);
+        setOcrText(`📁 檔案讀取成功：阿斯匹靈`);
+      }, 1000);
+    }
+  };
 
   // --- 帳號邏輯 ---
   const handleAuth = (e: React.FormEvent) => {
@@ -134,34 +192,35 @@ export const PasswordSettings: React.FC = () => {
                   </button>
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => {
-                    setLoading(true);
-                    setTimeout(() => {
-                      setLoading(false);
-                      setOcrText("📸 圖片辨識成功：阿斯匹靈");
-                    }, 1000);
-                  }} 
-                  className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition group"
-                >
-                  <Camera className="text-gray-400 group-hover:text-blue-600 mb-2" size={24} />
-                  <span className="text-xs font-bold text-gray-500 group-hover:text-blue-600">📸 拍照/截圖辨識</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    setLoading(true);
-                    setTimeout(() => {
-                      setLoading(false);
-                      setOcrText("📁 檔案讀取成功：阿斯匹靈");
-                    }, 1000);
-                  }} 
-                  className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition group"
-                >
-                  <Plus className="text-gray-400 group-hover:text-blue-600 mb-2" size={24} />
-                  <span className="text-xs font-bold text-gray-500 group-hover:text-blue-600">📁 上傳藥單檔案</span>
-                </button>
-              </div>
+              
+              {showCamera ? (
+                <div className="relative bg-black rounded-xl overflow-hidden aspect-video">
+                  <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                  <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
+                    <button onClick={takePhoto} className="p-4 bg-white rounded-full shadow-lg text-blue-600"><Camera size={24} /></button>
+                    <button onClick={stopCamera} className="p-4 bg-red-600 rounded-full shadow-lg text-white"><X size={24} /></button>
+                  </div>
+                  <canvas ref={canvasRef} className="hidden" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={startCamera} 
+                    className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition group"
+                  >
+                    <Camera className="text-gray-400 group-hover:text-blue-600 mb-2" size={24} />
+                    <span className="text-xs font-bold text-gray-500 group-hover:text-blue-600">📸 拍照/截圖辨識</span>
+                  </button>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()} 
+                    className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition group"
+                  >
+                    <Plus className="text-gray-400 group-hover:text-blue-600 mb-2" size={24} />
+                    <span className="text-xs font-bold text-gray-500 group-hover:text-blue-600">📁 上傳藥單檔案</span>
+                  </button>
+                  <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx" />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400">手動輸入或確認藥名</label>
@@ -249,15 +308,18 @@ export const PasswordSettings: React.FC = () => {
           <div className="p-6 max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4">
             <button onClick={() => setActiveTab("ai")} className="p-6 bg-blue-50 rounded-2xl border border-blue-100 text-center hover:shadow-md transition">
               <Activity className="text-blue-600 mx-auto mb-2" />
-              <div className="font-bold text-sm">AI 藥物分析</div>
+              <div className="font-bold text-blue-900 text-sm">AI 藥物分析</div>
+              <div className="text-[10px] text-blue-400 mt-1">拍照辨識與風險評估</div>
             </button>
             <button onClick={() => setActiveTab("baby")} className="p-6 bg-pink-50 rounded-2xl border border-pink-100 text-center hover:shadow-md transition">
               <Baby className="text-pink-600 mx-auto mb-2" />
-              <div className="font-bold text-sm">嬰兒用藥安全</div>
+              <div className="font-bold text-pink-900 text-sm">嬰兒用藥安全</div>
+              <div className="text-[10px] text-pink-400 mt-1">專屬劑量與禁忌提醒</div>
             </button>
             <button onClick={() => setActiveTab("chat")} className="p-6 bg-purple-50 rounded-2xl border border-purple-100 text-center hover:shadow-md transition">
               <MessageCircle className="text-purple-600 mx-auto mb-2" />
-              <div className="font-bold text-sm">AI 醫療問答</div>
+              <div className="font-bold text-purple-900 text-sm">AI 醫療問答</div>
+              <div className="text-[10px] text-purple-400 mt-1">家長諮詢與對話紀錄</div>
             </button>
           </div>
         );
@@ -266,32 +328,75 @@ export const PasswordSettings: React.FC = () => {
 
   if (!isLoggedIn) {
     return (
-      <div className="max-w-sm mx-auto mt-20 p-8 bg-white rounded-3xl border border-gray-100 shadow-xl">
-        <h2 className="text-xl font-bold text-center mb-8">{authMode === "login" ? "登入" : "註冊"}</h2>
-        <form onSubmit={handleAuth} className="space-y-4">
-          <input type="email" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm" placeholder="電子信箱" required />
-          <input type="password" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm" placeholder="密碼" required />
-          <button type="submit" className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition">進入系統</button>
-        </form>
-        <div className="mt-6 text-center">
-          <button onClick={() => setAuthMode(authMode === "login" ? "register" : "login")} className="text-xs text-blue-600 font-bold hover:underline">{authMode === "login" ? "沒有帳號？立即註冊" : "已有帳號？立即登入"}</button>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+          <div className="p-8 text-center bg-blue-600 text-white">
+            <Pill size={48} className="mx-auto mb-4" />
+            <h1 className="text-2xl font-bold">MedAssistant Pro</h1>
+            <p className="text-blue-100 text-sm mt-2">專業醫療輔助系統</p>
+          </div>
+          
+          <div className="p-8">
+            <div className="flex gap-4 mb-8">
+              <button onClick={() => setAuthMode("login")} className={`flex-1 pb-2 font-bold text-sm transition ${authMode === "login" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-400"}`}>登入</button>
+              <button onClick={() => setAuthMode("register")} className={`flex-1 pb-2 font-bold text-sm transition ${authMode === "register" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-400"}`}>註冊</button>
+            </div>
+
+            <form onSubmit={handleAuth} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">電子信箱</label>
+                <input type="email" required className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="name@example.com" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">密碼</label>
+                <input type="password" required className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="••••••••" />
+              </div>
+              <button type="submit" disabled={loading} className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-100 flex items-center justify-center gap-2">
+                {loading ? <RefreshCw className="animate-spin" size={20} /> : (authMode === "login" ? <LogIn size={20} /> : <UserPlus size={20} />)}
+                {authMode === "login" ? "立即登入" : "建立帳號"}
+              </button>
+            </form>
+
+            <div className="mt-6">
+              <div className="relative flex items-center justify-center mb-6">
+                <div className="absolute w-full border-t border-gray-100"></div>
+                <span className="relative bg-white px-4 text-xs text-gray-400 font-bold">或</span>
+              </div>
+              <button onClick={() => setIsLoggedIn(true)} className="w-full py-4 bg-white border-2 border-blue-600 text-blue-600 font-bold rounded-xl hover:bg-blue-50 transition flex items-center justify-center gap-2">
+                🚀 快速登入 (免帳密)
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto mt-8 flex flex-col md:flex-row gap-8 px-4">
-      <div className="w-full md:w-40 space-y-1">
-        {(["dashboard", "ai", "baby", "chat"] as Tab[]).map(t => (
-          <button key={t} onClick={() => setActiveTab(t)} className={`w-full text-left px-4 py-2 rounded-lg text-xs font-bold transition ${activeTab === t ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}>
-            {t === "dashboard" ? "總覽" : t === "ai" ? "AI 分析" : t === "baby" ? "嬰兒安全" : "AI 問答"}
-          </button>
-        ))}
-        <button onClick={() => setIsLoggedIn(false)} className="w-full text-left px-4 py-2 text-red-600 text-xs font-bold hover:bg-red-50 rounded-lg mt-4">登出</button>
-      </div>
-      <div className="flex-1 bg-white rounded-3xl border border-gray-100 shadow-sm min-h-[500px]">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* 導覽列 */}
+      <nav className="bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab("dashboard")}>
+          <div className="p-2 bg-blue-600 rounded-lg text-white"><Pill size={20} /></div>
+          <span className="font-bold text-gray-900 hidden sm:inline">MedAssistant Pro</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate("/")} className="text-sm font-bold text-gray-500 hover:text-blue-600 transition">首頁</button>
+          <button onClick={() => setIsLoggedIn(false)} className="p-2 text-gray-400 hover:text-red-600 transition"><LogOut size={20} /></button>
+        </div>
+      </nav>
+
+      {/* 主內容 */}
+      <main className="flex-1">
         {renderContent()}
+      </main>
+
+      {/* 底部導覽 (手機版) */}
+      <div className="sm:hidden bg-white border-t border-gray-100 flex justify-around py-3 sticky bottom-0">
+        <button onClick={() => setActiveTab("dashboard")} className={`p-2 ${activeTab === "dashboard" ? "text-blue-600" : "text-gray-400"}`}><LayoutDashboard size={24} /></button>
+        <button onClick={() => setActiveTab("ai")} className={`p-2 ${activeTab === "ai" ? "text-blue-600" : "text-gray-400"}`}><Activity size={24} /></button>
+        <button onClick={() => setActiveTab("baby")} className={`p-2 ${activeTab === "baby" ? "text-blue-600" : "text-gray-400"}`}><Baby size={24} /></button>
+        <button onClick={() => setActiveTab("chat")} className={`p-2 ${activeTab === "chat" ? "text-blue-600" : "text-gray-400"}`}><MessageCircle size={24} /></button>
       </div>
     </div>
   );
