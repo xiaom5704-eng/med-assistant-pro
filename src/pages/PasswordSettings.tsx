@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
   Pill, LayoutDashboard, LogOut, Activity, Baby, History, Send, Camera, 
-  Plus, Trash2, AlertTriangle, Check, RefreshCw, MessageCircle, User, LogIn, UserPlus, X
+  Plus, Trash2, AlertTriangle, Check, RefreshCw, MessageCircle, User, LogIn, UserPlus, X, FileText, Search
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -24,6 +24,12 @@ interface ChatMessage {
   timestamp: string;
 }
 
+interface Medication {
+  id: string;
+  name: string;
+  type: "ocr" | "file" | "manual";
+}
+
 export const PasswordSettings: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -39,8 +45,9 @@ export const PasswordSettings: React.FC = () => {
 
   // --- AI 分析狀態 ---
   const [ageGroup, setAgeGroup] = useState<AgeGroup>("adult");
+  const [medications, setMedications] = useState<Medication[]>([]);
+  const [manualInput, setManualInput] = useState("");
   const [analysisResult, setAnalysisResult] = useState<any>(null);
-  const [ocrText, setOcrText] = useState("");
   const [showCamera, setShowCamera] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
@@ -101,24 +108,32 @@ export const PasswordSettings: React.FC = () => {
         canvasRef.current.height = videoRef.current.videoHeight;
         context.drawImage(videoRef.current, 0, 0);
         stopCamera();
-        setLoading(true);
-        setTimeout(() => {
-          setLoading(false);
-          setOcrText("📸 圖片辨識成功：阿斯匹靈");
-        }, 1000);
+        addMedication("拍照辨識藥物", "ocr");
       }
     }
   };
 
-  // --- 檔案上傳邏輯 ---
+  // --- 藥物管理邏輯 ---
+  const addMedication = (name: string, type: "ocr" | "file" | "manual") => {
+    if (medications.length >= 4) {
+      alert("最多只能同時分析 4 種藥物。");
+      return;
+    }
+    if (!name.trim()) return;
+    setMedications([...medications, { id: Date.now().toString(), name, type }]);
+    setManualInput("");
+  };
+
+  const removeMedication = (id: string) => {
+    setMedications(medications.filter(m => m.id !== id));
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setLoading(true);
-      setTimeout(() => {
-        setLoading(false);
-        setOcrText(`📁 檔案讀取成功：阿斯匹靈`);
-      }, 1000);
+      // 模擬從檔名辨識藥物
+      const fileName = file.name.split(".")[0];
+      addMedication(fileName, "file");
     }
   };
 
@@ -134,15 +149,33 @@ export const PasswordSettings: React.FC = () => {
 
   // --- AI 分析邏輯 ---
   const runAnalysis = () => {
+    if (medications.length === 0) {
+      alert("請先新增至少一種藥物。");
+      return;
+    }
     setLoading(true);
     setTimeout(() => {
+      const names = medications.map(m => m.name.toLowerCase());
+      let risk = "低";
+      let advice = "請按醫囑服用，注意藥物交互作用。";
+      
+      // 模擬交互作用檢查
+      if (names.some(n => n.includes("阿斯匹靈")) && names.some(n => n.includes("布洛芬"))) {
+        risk = "高";
+        advice = "⚠️ 偵測到藥物相衝：阿斯匹靈與布洛芬併用會增加胃出血風險，請諮詢醫師。";
+      } else if (ageGroup === "infant") {
+        risk = "極高";
+        advice = "⚠️ 嬰兒用藥需極度謹慎，請務必諮詢醫師，嚴禁自行給藥。";
+      }
+
       setAnalysisResult({
         ageGroup: ageGroup === "infant" ? "嬰兒" : ageGroup === "elderly" ? "老年人" : "成年人",
-        risk: ageGroup === "infant" ? "極高" : "低",
-        advice: ageGroup === "infant" ? "嬰兒用藥需極度謹慎，請務必諮詢醫師。" : "請按醫囑服用，注意藥物交互作用。"
+        risk,
+        advice,
+        meds: medications.map(m => m.name)
       });
       setLoading(false);
-    }, 800);
+    }, 1200);
   };
 
   // --- 嬰兒用藥新增/刪除邏輯 ---
@@ -209,41 +242,61 @@ export const PasswordSettings: React.FC = () => {
                     className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition group"
                   >
                     <Camera className="text-gray-400 group-hover:text-blue-600 mb-2" size={24} />
-                    <span className="text-xs font-bold text-gray-500 group-hover:text-blue-600">📸 拍照/截圖辨識</span>
+                    <span className="text-xs font-bold text-gray-500 group-hover:text-blue-600">📸 拍照辨識</span>
                   </button>
                   <button 
                     onClick={() => fileInputRef.current?.click()} 
                     className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition group"
                   >
-                    <Plus className="text-gray-400 group-hover:text-blue-600 mb-2" size={24} />
-                    <span className="text-xs font-bold text-gray-500 group-hover:text-blue-600">📁 上傳藥單檔案</span>
+                    <FileText className="text-gray-400 group-hover:text-blue-600 mb-2" size={24} />
+                    <span className="text-xs font-bold text-gray-500 group-hover:text-blue-600">📁 上傳藥單</span>
                   </button>
-                  <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx" />
+                  <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,.pdf" />
                 </div>
               )}
 
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400">手動輸入或確認藥名</label>
-                <input 
-                  type="text" 
-                  className="w-full border border-gray-200 rounded-lg px-4 py-2 text-sm" 
-                  placeholder="例如：阿斯匹靈" 
-                  value={ocrText.includes("：") ? ocrText.split("：")[1] : ""}
-                  onChange={(e) => setOcrText(`手動輸入：${e.target.value}`)}
-                />
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-gray-400 uppercase">待分析藥物清單 ({medications.length}/4)</label>
+                <div className="space-y-2">
+                  {medications.map(m => (
+                    <div key={m.id} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <Pill size={16} className="text-blue-600" />
+                        <span className="text-sm font-bold text-gray-800">{m.name}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-400 rounded uppercase">{m.type}</span>
+                      </div>
+                      <button onClick={() => removeMedication(m.id)} className="text-gray-300 hover:text-red-600 transition"><X size={16} /></button>
+                    </div>
+                  ))}
+                  {medications.length < 4 && (
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm" 
+                        placeholder="手動輸入藥名..." 
+                        value={manualInput}
+                        onChange={(e) => setManualInput(e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && addMedication(manualInput, "manual")}
+                      />
+                      <button onClick={() => addMedication(manualInput, "manual")} className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"><Plus size={20} /></button>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <button onClick={runAnalysis} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-100">
+              <button onClick={runAnalysis} className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-100 flex items-center justify-center gap-2">
+                {loading ? <RefreshCw className="animate-spin" size={20} /> : <Search size={20} />}
                 開始 AI 深度分析
               </button>
             </div>
             {analysisResult && (
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-2 animate-in fade-in">
-                <div className="flex justify-between text-xs font-bold">
-                  <span className="text-gray-500">對象：{analysisResult.ageGroup}</span>
-                  <span className={analysisResult.risk === "極高" ? "text-red-600" : "text-green-600"}>風險：{analysisResult.risk}</span>
+              <div className={`p-5 rounded-2xl border space-y-3 animate-in fade-in slide-in-from-bottom-4 ${analysisResult.risk === "高" || analysisResult.risk === "極高" ? "bg-red-50 border-red-100" : "bg-green-50 border-green-100"}`}>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-gray-500 uppercase">分析報告 ({analysisResult.ageGroup})</span>
+                  <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${analysisResult.risk === "高" || analysisResult.risk === "極高" ? "bg-red-600 text-white" : "bg-green-600 text-white"}`}>風險：{analysisResult.risk}</span>
                 </div>
-                <p className="text-sm font-bold text-gray-900">{analysisResult.advice}</p>
+                <div className="text-sm font-bold text-gray-900 leading-relaxed">{analysisResult.advice}</div>
+                <div className="text-[10px] text-gray-400">分析藥物：{analysisResult.meds.join(", ")}</div>
               </div>
             )}
           </div>
@@ -309,7 +362,7 @@ export const PasswordSettings: React.FC = () => {
             <button onClick={() => setActiveTab("ai")} className="p-6 bg-blue-50 rounded-2xl border border-blue-100 text-center hover:shadow-md transition">
               <Activity className="text-blue-600 mx-auto mb-2" />
               <div className="font-bold text-blue-900 text-sm">AI 藥物分析</div>
-              <div className="text-[10px] text-blue-400 mt-1">拍照辨識與風險評估</div>
+              <div className="text-[10px] text-blue-400 mt-1">多藥物交互作用評估</div>
             </button>
             <button onClick={() => setActiveTab("baby")} className="p-6 bg-pink-50 rounded-2xl border border-pink-100 text-center hover:shadow-md transition">
               <Baby className="text-pink-600 mx-auto mb-2" />
