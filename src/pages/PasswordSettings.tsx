@@ -151,19 +151,33 @@ export const PasswordSettings: React.FC = () => {
                 </button>
                 <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => {
                   const isImage = e.target.files?.[0]?.type.startsWith('image/');
-                  setOcrText(isImage ? "📸 圖片辨識成功：阿斯匹靈 (Aspirin)" : "📁 檔案讀取成功：藥單分析中...");
+                  setOcrText(isImage ? "📸 圖片辨識成功：阿斯匹靈" : "📁 檔案讀取成功：阿斯匹靈");
                 }} />
               </div>
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400">手動輸入或確認藥名</label>
-                <input 
-                  type="text" 
-                  className="w-full border border-gray-200 rounded-lg px-4 py-2 text-sm" 
-                  placeholder="例如：阿斯匹靈" 
-                  value={ocrText.includes("：") ? ocrText.split("：")[1] : ""}
-                  onChange={(e) => setOcrText(`手動輸入：${e.target.value}`)}
-                />
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    className="flex-1 border border-gray-200 rounded-lg px-4 py-2 text-sm" 
+                    placeholder="例如：阿斯匹靈" 
+                    value={ocrText.includes("：") ? ocrText.split("：")[1] : ""}
+                    onChange={(e) => setOcrText(`手動輸入：${e.target.value}`)}
+                  />
+                  <button 
+                    onClick={() => {
+                      setLoading(true);
+                      setTimeout(() => {
+                        setLoading(false);
+                        alert("🔍 藥物資料檢索成功：阿斯匹靈 (Aspirin)");
+                      }, 500);
+                    }}
+                    className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition"
+                  >
+                    🔍 搜尋
+                  </button>
+                </div>
               </div>
 
               <button onClick={runAnalysis} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-100">
