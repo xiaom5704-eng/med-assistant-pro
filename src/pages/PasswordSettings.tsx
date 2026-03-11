@@ -1,8 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PasswordInput } from "../components/PasswordInput";
-import { Lock, Mail, CheckCircle2, AlertCircle } from "lucide-react";
+import { Lock, Mail, CheckCircle2, AlertCircle, LayoutDashboard, Pill, Calendar, User, LogOut } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export const PasswordSettings: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [isQuickLogin, setIsQuickLogin] = useState(false);
   const [activeTab, setActiveTab] = useState<"change" | "reset">("change");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -11,6 +15,13 @@ export const PasswordSettings: React.FC = () => {
   const [resetData, setResetData] = useState({ email: "", code: "", new: "", confirm: "" });
   const [step, setStep] = useState(1);
 
+  useEffect(() => {
+    // 檢查是否是從快速登入按鈕過來的
+    if (location.search.includes("mode=quick")) {
+      setIsQuickLogin(true);
+    }
+  }, [location]);
+
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (changeData.new !== changeData.confirm) {
@@ -18,7 +29,6 @@ export const PasswordSettings: React.FC = () => {
       return;
     }
     setLoading(true);
-    // 這裡應調用後端 API
     setTimeout(() => {
       setMessage({ type: "success", text: "密碼修改成功！" });
       setLoading(false);
@@ -29,7 +39,6 @@ export const PasswordSettings: React.FC = () => {
   const handleSendCode = async () => {
     if (!resetData.email) return;
     setLoading(true);
-    // 這裡應調用後端 API 發送驗證碼
     setTimeout(() => {
       setStep(2);
       setLoading(false);
@@ -44,7 +53,6 @@ export const PasswordSettings: React.FC = () => {
       return;
     }
     setLoading(true);
-    // 這裡應調用後端 API 重設密碼
     setTimeout(() => {
       setMessage({ type: "success", text: "密碼重設成功，請重新登入" });
       setLoading(false);
@@ -52,6 +60,65 @@ export const PasswordSettings: React.FC = () => {
       setResetData({ email: "", code: "", new: "", confirm: "" });
     }, 1000);
   };
+
+  // 如果是快速登入模式，顯示功能儀表板
+  if (isQuickLogin) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+          <div className="bg-blue-600 p-8 text-white">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-3xl font-bold flex items-center gap-2">
+                <LayoutDashboard /> 歡迎使用用藥助手 Pro
+              </h2>
+              <button 
+                onClick={() => navigate("/")}
+                className="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition"
+              >
+                <LogOut size={18} /> 登出
+              </button>
+            </div>
+            <p className="text-blue-100">您已透過快速登入進入系統，現在可以開始管理您的用藥計畫。</p>
+          </div>
+          
+          <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100 hover:shadow-md transition cursor-pointer group">
+              <div className="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                <Pill size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">藥品管理</h3>
+              <p className="text-gray-600 text-sm">新增、修改或刪除您的常用藥品清單。</p>
+            </div>
+            
+            <div className="p-6 bg-green-50 rounded-2xl border border-green-100 hover:shadow-md transition cursor-pointer group">
+              <div className="w-12 h-12 bg-green-600 text-white rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                <Calendar size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">用藥提醒</h3>
+              <p className="text-gray-600 text-sm">設定每日用藥時間，系統將準時提醒您。</p>
+            </div>
+            
+            <div className="p-6 bg-purple-50 rounded-2xl border border-purple-100 hover:shadow-md transition cursor-pointer group">
+              <div className="w-12 h-12 bg-purple-600 text-white rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                <User size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">個人檔案</h3>
+              <p className="text-gray-600 text-sm">管理您的健康資訊與緊急聯絡人。</p>
+            </div>
+          </div>
+
+          <div className="p-8 bg-gray-50 border-t border-gray-100 text-center">
+            <button 
+              onClick={() => setIsQuickLogin(false)}
+              className="text-blue-600 hover:underline font-medium"
+            >
+              需要設定密碼以保護帳號安全？點此前往設定
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto p-6 bg-white rounded-xl shadow-lg border border-gray-100">

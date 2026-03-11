@@ -7,7 +7,7 @@ const Home = () => (
     <h1 className="text-4xl font-bold text-blue-600 mb-4">用藥助手 Pro</h1>
     <p className="text-lg text-gray-600 mb-8">您的智能用藥管家，守護家人健康。</p>
     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-      <Link to="/password-settings" className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95">
+      <Link to="/password-settings?mode=quick" className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95">
         🚀 快速登入 (免帳密)
       </Link>
       <Link to="/password-settings" className="px-8 py-3 bg-white text-blue-600 font-semibold rounded-xl border-2 border-blue-600 hover:bg-blue-50 transition-all active:scale-95">
