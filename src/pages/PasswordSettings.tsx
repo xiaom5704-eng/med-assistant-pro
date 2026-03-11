@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
   Pill, LayoutDashboard, LogOut, Activity, Baby, History, Send, Camera, 
-  Plus, Trash2, AlertTriangle, Check, RefreshCw, MessageCircle, User, LogIn, UserPlus, X, FileText, Search, Info, ChevronRight, ChevronDown, ExternalLink, ShieldCheck, Eye, Download, BookOpen, AlertCircle
+  Plus, Trash2, AlertTriangle, Check, RefreshCw, MessageCircle, User, LogIn, UserPlus, X, FileText, Search, Info, ChevronRight, ChevronDown, ExternalLink, ShieldCheck, Eye, Download, BookOpen, AlertCircle, MapPin, Phone, Clock, Navigation
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 // --- 類型定義 ---
-type Tab = "dashboard" | "ai" | "baby" | "chat";
+type Tab = "dashboard" | "ai" | "baby" | "map";
 type AgeGroup = "infant" | "adult" | "elderly";
 type ReportMode = "simple" | "detail";
 type RiskLevel = "低" | "中" | "高" | "極高";
+type LocationType = "all" | "診所" | "藥局" | "醫院";
 
 interface UploadedFile {
   id: string;
@@ -17,6 +18,18 @@ interface UploadedFile {
   dataUrl: string;
   extractedText: string;
   timestamp: string;
+}
+
+interface MedicalLocation {
+  id: string;
+  name: string;
+  type: string;
+  address: string;
+  phone: string;
+  hours: string;
+  lat: number;
+  lng: number;
+  distance: number;
 }
 
 interface BabyAdvice {
@@ -27,178 +40,11 @@ interface BabyAdvice {
   warning: string;
 }
 
-interface ChatMessage {
-  id: string;
-  role: "user" | "ai";
-  content: string;
-  timestamp: string;
-}
-
 interface Medication {
   id: string;
   name: string;
   type: "ocr" | "file" | "manual";
 }
-
-// --- 擴充藥物資料庫（醫師級專業） ---
-const MED_DB: Record<string, { 
-  cn: string
-  purpose: string
-  offLabel: string
-  ingredient: string
-  risk: string
-  riskLevel: RiskLevel
-  infantRisk: RiskLevel
-  literature: { title: string; url: string }[]
-  tfda: string
-  nhi: string
-}> = {
-  "aspirin": { 
-    cn: "阿斯匹靈", 
-    purpose: "退燒、止痛、抗發炎、預防血栓",
-    offLabel: "預防心肌梗塞、川崎病治療",
-    ingredient: "Acetylsalicylic acid (乙醯水楊酸)",
-    risk: "可能引起胃腸不適、出血傾向",
-    riskLevel: "中",
-    infantRisk: "極高",
-    literature: [
-      { title: "Aspirin Use in Children: A Review of Safety", url: "https://pubmed.ncbi.nlm.nih.gov/" },
-      { title: "Reye's Syndrome and Aspirin Use in Children", url: "https://www.cdc.gov/" }
-    ],
-    tfda: "https://www.fda.gov.tw/",
-    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Aspirin"
-  },
-  "ibuprofen": { 
-    cn: "布洛芬 (伊普)", 
-    purpose: "退燒、止痛、抗發炎",
-    offLabel: "預防動脈導管未閉 (PDA)、風濕性關節炎",
-    ingredient: "Ibuprofen (異丁基苯丙酸)",
-    risk: "與阿斯匹靈併用會增加胃出血風險；可能影響腎功能",
-    riskLevel: "中",
-    infantRisk: "中",
-    literature: [
-      { title: "Ibuprofen Safety in Pediatric Patients", url: "https://pubmed.ncbi.nlm.nih.gov/" },
-      { title: "NSAID Use and Gastrointestinal Bleeding Risk", url: "https://www.nejm.org/" }
-    ],
-    tfda: "https://www.fda.gov.tw/",
-    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Ibuprofen"
-  },
-  "acetaminophen": { 
-    cn: "乙醯胺酚 (普拿疼)", 
-    purpose: "退燒、緩解輕微疼痛",
-    offLabel: "術後疼痛管理、牙痛緩解",
-    ingredient: "Paracetamol (對乙醯胺基酚)",
-    risk: "過量使用會造成肝臟損傷；長期使用需監測肝功能",
-    riskLevel: "低",
-    infantRisk: "低",
-    literature: [
-      { title: "Acetaminophen Dosing in Pediatric Patients", url: "https://pubmed.ncbi.nlm.nih.gov/" },
-      { title: "Hepatotoxicity Risk of Paracetamol Overdose", url: "https://www.thelancet.com/" }
-    ],
-    tfda: "https://www.fda.gov.tw/",
-    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Acetaminophen"
-  },
-  "amoxicillin": { 
-    cn: "阿莫西林 (安莫西林)", 
-    purpose: "治療細菌感染（中耳炎、肺炎、尿道炎）",
-    offLabel: "預防菌血症、風濕熱預防",
-    ingredient: "Amoxicillin (氨苄青黴素)",
-    risk: "需按療程服用完畢，避免產生抗藥性；可能引起過敏反應",
-    riskLevel: "低",
-    infantRisk: "低",
-    literature: [
-      { title: "Amoxicillin Efficacy in Pediatric Infections", url: "https://pubmed.ncbi.nlm.nih.gov/" },
-      { title: "Antibiotic Resistance and Incomplete Courses", url: "https://www.who.int/" }
-    ],
-    tfda: "https://www.fda.gov.tw/",
-    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Amoxicillin"
-  },
-  "panadol": { 
-    cn: "普拿疼", 
-    purpose: "退燒、緩解疼痛",
-    offLabel: "術後疼痛、頭痛管理",
-    ingredient: "Paracetamol (對乙醯胺基酚)",
-    risk: "過量使用會造成肝臟損傷",
-    riskLevel: "低",
-    infantRisk: "低",
-    literature: [
-      { title: "Paracetamol Safety Profile in Children", url: "https://pubmed.ncbi.nlm.nih.gov/" }
-    ],
-    tfda: "https://www.fda.gov.tw/",
-    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Acetaminophen"
-  },
-  "diclofenac": {
-    cn: "待克菲那 (非類固醇消炎藥)",
-    purpose: "緩解發炎與疼痛、退燒",
-    offLabel: "術後疼痛、腎絞痛、偏頭痛",
-    ingredient: "Diclofenac Sodium (雙氯芬酸鈉)",
-    risk: "可能引起胃腸不適，需飯後服用；長期使用需監測腎功能",
-    riskLevel: "中",
-    infantRisk: "高",
-    literature: [
-      { title: "Diclofenac Safety in Pediatric Use", url: "https://pubmed.ncbi.nlm.nih.gov/" },
-      { title: "NSAID-Related Gastrointestinal Complications", url: "https://www.gastrojournal.org/" }
-    ],
-    tfda: "https://www.fda.gov.tw/",
-    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Diclofenac"
-  },
-  "mefenamic": {
-    cn: "博疏痛 (止痛藥)",
-    purpose: "緩解經痛與輕度疼痛",
-    offLabel: "術後疼痛、頭痛、牙痛",
-    ingredient: "Mefenamic Acid (甲芬那酸)",
-    risk: "氣喘患者需謹慎使用；可能引起胃腸不適",
-    riskLevel: "中",
-    infantRisk: "高",
-    literature: [
-      { title: "Mefenamic Acid in Pediatric Patients", url: "https://pubmed.ncbi.nlm.nih.gov/" }
-    ],
-    tfda: "https://www.fda.gov.tw/",
-    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Mefenamic"
-  },
-  "阿斯匹靈": { 
-    cn: "阿斯匹靈", 
-    purpose: "退燒、止痛、抗發炎、預防血栓",
-    offLabel: "預防心肌梗塞、川崎病治療",
-    ingredient: "Acetylsalicylic acid (乙醯水楊酸)",
-    risk: "可能引起胃腸不適、出血傾向",
-    riskLevel: "中",
-    infantRisk: "極高",
-    literature: [
-      { title: "Aspirin Use in Children: A Review of Safety", url: "https://pubmed.ncbi.nlm.nih.gov/" }
-    ],
-    tfda: "https://www.fda.gov.tw/",
-    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Aspirin"
-  },
-  "布洛芬": { 
-    cn: "布洛芬", 
-    purpose: "退燒、止痛、抗發炎",
-    offLabel: "預防動脈導管未閉 (PDA)、風濕性關節炎",
-    ingredient: "Ibuprofen (異丁基苯丙酸)",
-    risk: "與阿斯匹靈併用會增加胃出血風險",
-    riskLevel: "中",
-    infantRisk: "中",
-    literature: [
-      { title: "Ibuprofen Safety in Pediatric Patients", url: "https://pubmed.ncbi.nlm.nih.gov/" }
-    ],
-    tfda: "https://www.fda.gov.tw/",
-    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Ibuprofen"
-  },
-  "普拿疼": { 
-    cn: "普拿疼", 
-    purpose: "退燒、緩解疼痛",
-    offLabel: "術後疼痛、頭痛管理",
-    ingredient: "Paracetamol (對乙醯胺基酚)",
-    risk: "過量使用會造成肝臟損傷",
-    riskLevel: "低",
-    infantRisk: "低",
-    literature: [
-      { title: "Paracetamol Safety Profile in Children", url: "https://pubmed.ncbi.nlm.nih.gov/" }
-    ],
-    tfda: "https://www.fda.gov.tw/",
-    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Acetaminophen"
-  }
-};
 
 // --- 風險等級配色 ---
 const getRiskColor = (level: RiskLevel) => {
@@ -235,6 +81,11 @@ export const PasswordSettings: React.FC = () => {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [showFilePreview, setShowFilePreview] = useState(false);
 
+  // --- 醫療地圖狀態 ---
+  const [medicalLocations, setMedicalLocations] = useState<MedicalLocation[]>([]);
+  const [locationFilter, setLocationFilter] = useState<LocationType>("all");
+  const [loadingLocations, setLoadingLocations] = useState(false);
+
   // --- 嬰兒用藥狀態 ---
   const [babyAdvices, setBabyAdvices] = useState<BabyAdvice[]>([
     { id: "1", symptom: "發燒", med: "乙醯胺酚 (Acetaminophen)", dosage: "10-15mg/kg", warning: "嚴禁使用阿斯匹靈。" },
@@ -242,12 +93,6 @@ export const PasswordSettings: React.FC = () => {
   ]);
   const [showAddBaby, setShowAddBaby] = useState(false);
   const [newBaby, setNewBaby] = useState({ symptom: "", med: "", dosage: "", warning: "" });
-
-  // --- AI 醫療問答狀態 ---
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { id: "1", role: "ai", content: "您好！我是您的 AI 醫療助手。請問今天有什麼可以幫您的？", timestamp: new Date().toLocaleTimeString() }
-  ]);
-  const [inputMsg, setInputMsg] = useState("");
 
   // --- 初始化 ---
   useEffect(() => {
@@ -293,7 +138,6 @@ export const PasswordSettings: React.FC = () => {
         context.drawImage(videoRef.current, 0, 0);
         const dataUrl = canvasRef.current.toDataURL("image/jpeg");
         
-        // 模擬 OCR 翻譯：從圖片中提取藥名（實際應用中應使用真實 OCR API）
         const extractedText = "Aspirin (阿斯匹靈)";
         
         const newFile: UploadedFile = {
@@ -320,7 +164,6 @@ export const PasswordSettings: React.FC = () => {
         const dataUrl = event.target?.result as string;
         const fileName = file.name.split(".")[0];
         
-        // 模擬 OCR 翻譯
         const extractedText = `${fileName} (已上傳)`;
         
         const newFile: UploadedFile = {
@@ -368,65 +211,61 @@ export const PasswordSettings: React.FC = () => {
     }, 500);
   };
 
-  // --- AI 分析邏輯（醫師級） ---
-  const runAnalysis = () => {
+  // --- AI 分析邏輯（呼叫後端 API） ---
+  const runAnalysis = async () => {
     if (medications.length === 0) {
       alert("請先新增至少一種藥物。");
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      const medDetails = medications.map(m => {
-        const key = m.name.toLowerCase();
-        return {
-          original: m.name,
-          ... (MED_DB[key] || { 
-            cn: m.name, 
-            purpose: "未知用途", 
-            offLabel: "無相關資料",
-            ingredient: "未知成分", 
-            risk: "尚無資料",
-            riskLevel: "中" as RiskLevel,
-            infantRisk: "中" as RiskLevel,
-            literature: [],
-            tfda: `https://www.fda.gov.tw/`,
-            nhi: `https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=${m.name}`
-          })
-        };
+    try {
+      const medNames = medications.map(m => m.name);
+      const response = await fetch('/api/analyze-medication', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ medications: medNames, ageGroup })
       });
-
-      let riskLevel: RiskLevel = "低";
-      let summary = "藥物組合相對安全，請按醫囑服用。";
       
-      // 檢查交互作用
-      const names = medDetails.map(d => d.cn);
-      if (names.includes("阿斯匹靈") && names.includes("布洛芬")) {
-        riskLevel = "高";
-        summary = "⚠️ 偵測到藥物相衝：阿斯匹靈與布洛芬併用會增加胃出血風險，請立即諮詢醫師。";
-      } else if (ageGroup === "infant") {
-        // 嬰兒用藥需檢查每種藥物的嬰兒風險
-        const infantRisks = medDetails.map(d => d.infantRisk);
-        if (infantRisks.includes("極高")) {
-          riskLevel = "極高";
-          summary = "⚠️ 嚴重警告：此藥物組合對嬰兒極度危險，請務必諮詢醫師，嚴禁自行給藥。";
-        } else if (infantRisks.includes("高")) {
-          riskLevel = "高";
-          summary = "⚠️ 注意：嬰兒用藥需謹慎，請務必諮詢醫師並精確測量劑量。";
-        } else {
-          riskLevel = "中";
-          summary = "嬰兒用藥需特別注意，請按醫囑精確測量劑量。";
-        }
+      if (response.ok) {
+        const data = await response.json();
+        setAnalysisResult(data);
+      } else {
+        alert('分析失敗，請稍後重試');
       }
-
-      setAnalysisResult({
-        ageGroup: ageGroup === "infant" ? "嬰兒" : ageGroup === "elderly" ? "老年人" : "成年人",
-        riskLevel,
-        summary,
-        medDetails
-      });
+    } catch (error) {
+      console.error('API 呼叫失敗:', error);
+      alert('無法連接到服務器，請檢查網路連線');
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   };
+
+  // --- 醫療地點查詢 ---
+  const fetchMedicalLocations = async () => {
+    setLoadingLocations(true);
+    try {
+      const typeParam = locationFilter === 'all' ? 'all' : locationFilter;
+      const response = await fetch(`/api/nearby-medical-locations?type=${typeParam}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setMedicalLocations(data.locations);
+      } else {
+        alert('查詢失敗，請稍後重試');
+      }
+    } catch (error) {
+      console.error('查詢失敗:', error);
+      alert('無法連接到服務器，請檢查網路連線');
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'map') {
+      fetchMedicalLocations();
+    }
+  }, [activeTab, locationFilter]);
 
   // --- 嬰兒用藥新增/刪除邏輯 ---
   const addBabyAdvice = () => {
@@ -440,27 +279,7 @@ export const PasswordSettings: React.FC = () => {
     setBabyAdvices(babyAdvices.filter(a => a.id !== id));
   };
 
-  // --- AI 問答邏輯 ---
-  const sendChat = () => {
-    if (!inputMsg.trim()) return;
-    const userMsg: ChatMessage = { id: Date.now().toString(), role: "user", content: inputMsg, timestamp: new Date().toLocaleTimeString() };
-    setChatMessages([...chatMessages, userMsg]);
-    setInputMsg("");
-    
-    setLoading(true);
-    setTimeout(() => {
-      const aiMsg: ChatMessage = { 
-        id: (Date.now() + 1).toString(), 
-        role: "ai", 
-        content: `針對您的問題「${inputMsg}」，建議您先確認藥物包裝上的說明。如果是給嬰兒使用，請務必精確測量體重對應的劑量。若症狀持續，請立即就醫。`, 
-        timestamp: new Date().toLocaleTimeString() 
-      };
-      setChatMessages(prev => [...prev, aiMsg]);
-      setLoading(false);
-    }, 1000);
-  };
-
-  // --- 渲染 AI 藥物分析頁面（醫師級專業版） ---
+  // --- 渲染 AI 藥物分析頁面 ---
   const renderAIAnalysis = () => {
     const colors = analysisResult ? getRiskColor(analysisResult.riskLevel) : {};
     
@@ -650,7 +469,7 @@ export const PasswordSettings: React.FC = () => {
           {loading ? "AI 深度分析中..." : "開始 AI 深度分析"}
         </button>
 
-        {/* 分析結果（醫師級專業版） */}
+        {/* 分析結果 */}
         {analysisResult && (
           <div className={`rounded-xl border-2 space-y-0 animate-in fade-in slide-in-from-bottom-4 overflow-hidden ${colors.bg} ${colors.border}`}>
             {/* 報告頭部 */}
@@ -741,16 +560,10 @@ export const PasswordSettings: React.FC = () => {
                         </span>
                       </div>
 
-                      {/* 成分與作用 */}
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <div className="text-gray-600 font-bold mb-1">主要成分</div>
-                          <div className="text-gray-800">{d.ingredient}</div>
-                        </div>
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <div className="text-gray-600 font-bold mb-1">主要用途</div>
-                          <div className="text-gray-800">{d.purpose}</div>
-                        </div>
+                      {/* 主要用途 */}
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                        <div className="text-blue-700 font-bold text-xs mb-1">💊 主要用途</div>
+                        <div className="text-blue-600 text-xs">{d.purpose}</div>
                       </div>
 
                       {/* Off-label 用途 */}
@@ -761,11 +574,40 @@ export const PasswordSettings: React.FC = () => {
                         </div>
                       )}
 
+                      {/* 成分與機制 */}
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="p-3 bg-gray-50 rounded-lg">
+                          <div className="text-gray-600 font-bold mb-1">主要成分</div>
+                          <div className="text-gray-800">{d.ingredient}</div>
+                        </div>
+                        <div className="p-3 bg-gray-50 rounded-lg">
+                          <div className="text-gray-600 font-bold mb-1">藥理機制</div>
+                          <div className="text-gray-800">{d.mechanism}</div>
+                        </div>
+                      </div>
+
+                      {/* 劑量 */}
+                      <div className="p-3 bg-cyan-50 rounded-lg border border-cyan-100">
+                        <div className="text-cyan-700 font-bold text-xs mb-1">⏱️ 建議劑量</div>
+                        <div className="text-cyan-600 text-xs">{d.dosage}</div>
+                      </div>
+
                       {/* 風險提示 */}
                       <div className="p-3 bg-red-50 rounded-lg border border-red-100">
                         <div className="text-red-700 font-bold text-xs mb-1">⚠️ 風險提示</div>
                         <div className="text-red-600 text-xs">{d.risk}</div>
+                        {d.reyes && (
+                          <div className="text-red-700 font-bold text-xs mt-2">🚨 {d.reyes}</div>
+                        )}
                       </div>
+
+                      {/* 藥物交互作用 */}
+                      {d.interactions && d.interactions.length > 0 && (
+                        <div className="p-3 bg-orange-50 rounded-lg border border-orange-100">
+                          <div className="text-orange-700 font-bold text-xs mb-1">🔗 可能的交互作用</div>
+                          <div className="text-orange-600 text-xs">{d.interactions.join('、')}</div>
+                        </div>
+                      )}
 
                       {/* 權威文獻 */}
                       {d.literature && d.literature.length > 0 && (
@@ -820,6 +662,115 @@ export const PasswordSettings: React.FC = () => {
             </div>
           </div>
         )}
+      </div>
+    );
+  };
+
+  // --- 渲染醫療地圖導航頁面 ---
+  const renderMedicalMap = () => {
+    return (
+      <div className="p-6 max-w-4xl mx-auto space-y-6">
+        <div className="space-y-2">
+          <h3 className="text-3xl font-bold flex items-center gap-3">
+            <MapPin className="text-red-600" size={32} /> 
+            附近醫療機構
+          </h3>
+          <p className="text-sm text-gray-600">快速找到附近的診所、藥局與醫院</p>
+        </div>
+
+        {/* 篩選按鈕 */}
+        <div className="space-y-3">
+          <label className="text-xs font-bold text-gray-600 uppercase">篩選機構類型</label>
+          <div className="flex gap-2 flex-wrap">
+            {(["all", "診所", "藥局", "醫院"] as LocationType[]).map(type => (
+              <button 
+                key={type}
+                onClick={() => setLocationFilter(type)}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
+                  locationFilter === type
+                    ? "bg-red-600 text-white shadow-md"
+                    : "bg-white text-gray-600 border border-gray-200 hover:border-red-400"
+                }`}
+              >
+                {type === "all" ? "全部" : type === "診所" ? "🏥 診所" : type === "藥局" ? "💊 藥局" : "🚑 醫院"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 醫療機構清單 */}
+        <div className="space-y-3">
+          {loadingLocations ? (
+            <div className="text-center py-8">
+              <RefreshCw className="animate-spin mx-auto text-gray-400 mb-2" size={32} />
+              <p className="text-gray-500">查詢中...</p>
+            </div>
+          ) : medicalLocations.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+              <MapPin className="text-gray-300 mx-auto mb-2" size={32} />
+              <p className="text-gray-500">未找到符合條件的機構</p>
+            </div>
+          ) : (
+            medicalLocations.map(location => (
+              <div key={location.id} className="p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition">
+                <div className="flex justify-between items-start gap-3 mb-3">
+                  <div>
+                    <div className="font-bold text-gray-900 text-lg">{location.name}</div>
+                    <div className={`text-xs font-bold px-2 py-1 rounded-full inline-block mt-1 ${
+                      location.type === "診所" ? "bg-blue-100 text-blue-700" :
+                      location.type === "藥局" ? "bg-green-100 text-green-700" :
+                      "bg-red-100 text-red-700"
+                    }`}>
+                      {location.type === "診所" ? "🏥" : location.type === "藥局" ? "💊" : "🚑"} {location.type}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-gray-900">{location.distance.toFixed(1)} km</div>
+                    <div className="text-xs text-gray-500">距離</div>
+                  </div>
+                </div>
+
+                {/* 地址 */}
+                <div className="flex items-start gap-2 mb-2">
+                  <MapPin size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-gray-700">{location.address}</div>
+                </div>
+
+                {/* 電話 */}
+                <div className="flex items-center gap-2 mb-2">
+                  <Phone size={16} className="text-gray-400 flex-shrink-0" />
+                  <a href={`tel:${location.phone}`} className="text-sm text-blue-600 hover:underline font-bold">
+                    {location.phone}
+                  </a>
+                </div>
+
+                {/* 營業時間 */}
+                <div className="flex items-start gap-2 mb-3">
+                  <Clock size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-gray-700">{location.hours}</div>
+                </div>
+
+                {/* 操作按鈕 */}
+                <div className="flex gap-2">
+                  <a 
+                    href={`tel:${location.phone}`}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition"
+                  >
+                    <Phone size={16} /> 撥號
+                  </a>
+                  <a 
+                    href={`https://maps.google.com/?q=${location.lat},${location.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition"
+                  >
+                    <Navigation size={16} /> 導航
+                  </a>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     );
   };
@@ -927,62 +878,6 @@ export const PasswordSettings: React.FC = () => {
     );
   };
 
-  // --- 渲染 AI 醫療問答頁面 ---
-  const renderChat = () => {
-    return (
-      <div className="p-6 max-w-3xl mx-auto h-[600px] flex flex-col">
-        <div className="space-y-2 mb-6">
-          <h3 className="text-2xl font-bold flex items-center gap-3">
-            <MessageCircle className="text-purple-600" size={28} /> 
-            AI 醫療問答
-          </h3>
-          <p className="text-sm text-gray-500">向 AI 助手諮詢用藥與健康問題</p>
-        </div>
-
-        <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2 bg-white rounded-lg p-4 border border-gray-200">
-          {chatMessages.map(m => (
-            <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[75%] p-3 rounded-lg text-sm font-medium ${
-                m.role === "user" 
-                  ? "bg-blue-600 text-white rounded-br-none" 
-                  : "bg-gray-100 text-gray-800 rounded-bl-none"
-              }`}>
-                {m.content}
-                <div className="text-[10px] mt-1 opacity-60">{m.timestamp}</div>
-              </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="p-3 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium animate-pulse">
-                AI 正在思考中...
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex gap-2">
-          <input 
-            type="text" 
-            className="flex-1 border border-gray-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none" 
-            placeholder="輸入您的問題..." 
-            value={inputMsg} 
-            onChange={e => setInputMsg(e.target.value)} 
-            onKeyPress={e => e.key === "Enter" && sendChat()}
-            disabled={loading}
-          />
-          <button 
-            onClick={sendChat} 
-            disabled={!inputMsg.trim() || loading}
-            className="p-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
-          >
-            <Send size={20} />
-          </button>
-        </div>
-      </div>
-    );
-  };
-
   // --- 渲染儀表板 ---
   const renderDashboard = () => {
     return (
@@ -1012,12 +907,12 @@ export const PasswordSettings: React.FC = () => {
           </button>
 
           <button 
-            onClick={() => setActiveTab("chat")} 
-            className="p-6 bg-purple-50 rounded-xl border border-purple-200 text-left hover:shadow-lg hover:border-purple-400 transition group"
+            onClick={() => setActiveTab("map")} 
+            className="p-6 bg-red-50 rounded-xl border border-red-200 text-left hover:shadow-lg hover:border-red-400 transition group"
           >
-            <MessageCircle className="text-purple-600 mb-3 group-hover:scale-110 transition" size={32} />
-            <div className="font-bold text-purple-900 text-lg">AI 醫療問答</div>
-            <div className="text-xs text-purple-600 mt-2">家長諮詢與對話紀錄</div>
+            <MapPin className="text-red-600 mb-3 group-hover:scale-110 transition" size={32} />
+            <div className="font-bold text-red-900 text-lg">附近醫療機構</div>
+            <div className="text-xs text-red-600 mt-2">診所、藥局與醫院導航</div>
           </button>
         </div>
       </div>
@@ -1031,8 +926,8 @@ export const PasswordSettings: React.FC = () => {
         return renderAIAnalysis();
       case "baby":
         return renderBabySafety();
-      case "chat":
-        return renderChat();
+      case "map":
+        return renderMedicalMap();
       case "dashboard":
       default:
         return renderDashboard();
@@ -1190,15 +1085,15 @@ export const PasswordSettings: React.FC = () => {
           <span className="text-[10px] mt-1 font-bold">嬰兒</span>
         </button>
         <button 
-          onClick={() => setActiveTab("chat")} 
+          onClick={() => setActiveTab("map")} 
           className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg transition ${
-            activeTab === "chat" 
-              ? "text-blue-600 bg-blue-50" 
+            activeTab === "map" 
+              ? "text-red-600 bg-red-50" 
               : "text-gray-400 hover:text-gray-600"
           }`}
         >
-          <MessageCircle size={24} />
-          <span className="text-[10px] mt-1 font-bold">問答</span>
+          <MapPin size={24} />
+          <span className="text-[10px] mt-1 font-bold">醫療</span>
         </button>
       </div>
     </div>
