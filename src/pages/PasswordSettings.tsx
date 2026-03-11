@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
   Pill, LayoutDashboard, LogOut, Activity, Baby, History, Send, Camera, 
-  Plus, Trash2, AlertTriangle, Check, RefreshCw, MessageCircle, User, LogIn, UserPlus, X, FileText, Search, Info, ChevronRight, ChevronDown
+  Plus, Trash2, AlertTriangle, Check, RefreshCw, MessageCircle, User, LogIn, UserPlus, X, FileText, Search, Info, ChevronRight, ChevronDown, ExternalLink, ShieldCheck
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -30,15 +30,78 @@ interface Medication {
   type: "ocr" | "file" | "manual";
 }
 
-// --- 藥物資料庫 (模擬) ---
-const MED_DB: Record<string, { cn: string, purpose: string, ingredient: string, risk: string }> = {
-  "aspirin": { cn: "阿斯匹靈", purpose: "退燒、止痛、抗發炎", ingredient: "Acetylsalicylic acid", risk: "嬰兒使用可能導致瑞氏症候群 (Reye's syndrome)，極高風險。" },
-  "ibuprofen": { cn: "布洛芬", purpose: "緩解發燒與中度疼痛", ingredient: "Ibuprofen", risk: "與阿斯匹靈併用會增加胃出血風險。" },
-  "acetaminophen": { cn: "乙醯胺酚 (普拿疼)", purpose: "退燒、緩解輕微疼痛", ingredient: "Paracetamol", risk: "過量使用會造成肝臟損傷。" },
-  "amoxicillin": { cn: "阿莫西林 (抗生素)", purpose: "治療細菌感染", ingredient: "Amoxicillin", risk: "需按療程服用完畢，避免產生抗藥性。" },
-  "panadol": { cn: "普拿疼", purpose: "退燒、緩解疼痛", ingredient: "Paracetamol", risk: "過量使用會造成肝臟損傷。" },
-  "阿斯匹靈": { cn: "阿斯匹靈", purpose: "退燒、止痛、抗發炎", ingredient: "Acetylsalicylic acid", risk: "嬰兒使用可能導致瑞氏症候群 (Reye's syndrome)，極高風險。" },
-  "布洛芬": { cn: "布洛芬", purpose: "緩解發燒與中度疼痛", ingredient: "Ibuprofen", risk: "與阿斯匹靈併用會增加胃出血風險。" }
+// --- 擴充藥物資料庫 (模擬健保用藥品項) ---
+const MED_DB: Record<string, { cn: string, purpose: string, ingredient: string, risk: string, link: string }> = {
+  "aspirin": { 
+    cn: "阿斯匹靈", 
+    purpose: "退燒、止痛、抗發炎", 
+    ingredient: "Acetylsalicylic acid", 
+    risk: "嬰兒使用可能導致瑞氏症候群 (Reye's syndrome)，極高風險。",
+    link: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Aspirin"
+  },
+  "ibuprofen": { 
+    cn: "布洛芬 (伊普)", 
+    purpose: "緩解發燒與中度疼痛", 
+    ingredient: "Ibuprofen", 
+    risk: "與阿斯匹靈併用會增加胃出血風險。",
+    link: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Ibuprofen"
+  },
+  "acetaminophen": { 
+    cn: "乙醯胺酚 (普拿疼)", 
+    purpose: "退燒、緩解輕微疼痛", 
+    ingredient: "Paracetamol", 
+    risk: "過量使用會造成肝臟損傷。",
+    link: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Acetaminophen"
+  },
+  "amoxicillin": { 
+    cn: "阿莫西林 (萬古黴素類)", 
+    purpose: "治療細菌感染", 
+    ingredient: "Amoxicillin", 
+    risk: "需按療程服用完畢，避免產生抗藥性。",
+    link: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Amoxicillin"
+  },
+  "panadol": { 
+    cn: "普拿疼", 
+    purpose: "退燒、緩解疼痛", 
+    ingredient: "Paracetamol", 
+    risk: "過量使用會造成肝臟損傷。",
+    link: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Acetaminophen"
+  },
+  "diclofenac": {
+    cn: "待克菲那 (非類固醇消炎藥)",
+    purpose: "緩解發炎與疼痛",
+    ingredient: "Diclofenac Sodium",
+    risk: "可能引起胃腸不適，需飯後服用。",
+    link: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Diclofenac"
+  },
+  "mefenamic": {
+    cn: "博疏痛 (止痛藥)",
+    purpose: "緩解經痛與輕度疼痛",
+    ingredient: "Mefenamic Acid",
+    risk: "氣喘患者需謹慎使用。",
+    link: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Mefenamic"
+  },
+  "阿斯匹靈": { 
+    cn: "阿斯匹靈", 
+    purpose: "退燒、止痛、抗發炎", 
+    ingredient: "Acetylsalicylic acid", 
+    risk: "嬰兒使用可能導致瑞氏症候群 (Reye's syndrome)，極高風險。",
+    link: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Aspirin"
+  },
+  "布洛芬": { 
+    cn: "布洛芬", 
+    purpose: "緩解發燒與中度疼痛", 
+    ingredient: "Ibuprofen", 
+    risk: "與阿斯匹靈併用會增加胃出血風險。",
+    link: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Ibuprofen"
+  },
+  "普拿疼": { 
+    cn: "普拿疼", 
+    purpose: "退燒、緩解疼痛", 
+    ingredient: "Paracetamol", 
+    risk: "過量使用會造成肝臟損傷。",
+    link: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Acetaminophen"
+  }
 };
 
 export const PasswordSettings: React.FC = () => {
@@ -170,7 +233,13 @@ export const PasswordSettings: React.FC = () => {
         const key = m.name.toLowerCase();
         return {
           original: m.name,
-          ... (MED_DB[key] || { cn: m.name, purpose: "未知用途", ingredient: "未知成分", risk: "尚無資料" })
+          ... (MED_DB[key] || { 
+            cn: m.name, 
+            purpose: "未知用途", 
+            ingredient: "未知成分", 
+            risk: "尚無資料",
+            link: `https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=${m.name}`
+          })
         };
       });
 
@@ -324,11 +393,16 @@ export const PasswordSettings: React.FC = () => {
                     <div className="text-sm font-bold text-gray-900 leading-relaxed">{analysisResult.summary}</div>
                     <div className="space-y-2">
                       {analysisResult.medDetails.map((d: any, i: number) => (
-                        <div key={i} className="flex items-start gap-2 p-2 bg-white/50 rounded-lg">
-                          <Info size={14} className="text-blue-500 mt-0.5 shrink-0" />
-                          <div className="text-xs">
-                            <span className="font-bold text-blue-700">{d.cn}</span>：{d.purpose}
+                        <div key={i} className="flex items-start justify-between p-2 bg-white/50 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <Info size={14} className="text-blue-500 mt-0.5 shrink-0" />
+                            <div className="text-xs">
+                              <span className="font-bold text-blue-700">{d.cn}</span>：{d.purpose}
+                            </div>
                           </div>
+                          <a href={d.link} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 transition ml-2">
+                            <ExternalLink size={14} />
+                          </a>
                         </div>
                       ))}
                     </div>
@@ -339,6 +413,9 @@ export const PasswordSettings: React.FC = () => {
                       <div key={i} className="p-3 bg-white rounded-xl border border-gray-100 space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-bold text-gray-900">{d.cn} <span className="text-[10px] text-gray-400 font-normal">({d.original})</span></span>
+                          <a href={d.link} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[10px] text-blue-600 font-bold hover:underline">
+                            <ExternalLink size={10} /> 健保署資料
+                          </a>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-[10px]">
                           <div className="p-2 bg-gray-50 rounded">
@@ -358,6 +435,11 @@ export const PasswordSettings: React.FC = () => {
                     ))}
                   </div>
                 )}
+                
+                <div className="pt-2 border-t border-gray-100 flex items-center gap-2 text-[10px] text-gray-400 italic">
+                  <ShieldCheck size={12} />
+                  資料來源：衛生福利部中央健康保險署
+                </div>
               </div>
             )}
           </div>
