@@ -6,9 +6,12 @@ const Home = () => (
   <div className="flex flex-col items-center justify-center h-screen bg-gray-50 text-center">
     <h1 className="text-4xl font-bold text-blue-600 mb-4">用藥助手 Pro</h1>
     <p className="text-lg text-gray-600 mb-8">您的智能用藥管家，守護家人健康。</p>
-    <div className="space-x-4">
-      <Link to="/password-settings" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-        進入密碼設定
+    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+      <Link to="/password-settings" className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95">
+        🚀 快速登入 (免帳密)
+      </Link>
+      <Link to="/password-settings" className="px-8 py-3 bg-white text-blue-600 font-semibold rounded-xl border-2 border-blue-600 hover:bg-blue-50 transition-all active:scale-95">
+        密碼安全設定
       </Link>
     </div>
   </div>
