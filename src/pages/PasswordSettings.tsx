@@ -136,48 +136,42 @@ export const PasswordSettings: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <button 
-                  onClick={() => fileInputRef.current?.click()} 
+                  onClick={() => {
+                    setLoading(true);
+                    setTimeout(() => {
+                      setLoading(false);
+                      setOcrText("📸 圖片辨識成功：阿斯匹靈");
+                    }, 1000);
+                  }} 
                   className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition group"
                 >
                   <Camera className="text-gray-400 group-hover:text-blue-600 mb-2" size={24} />
                   <span className="text-xs font-bold text-gray-500 group-hover:text-blue-600">📸 拍照/截圖辨識</span>
                 </button>
                 <button 
-                  onClick={() => fileInputRef.current?.click()} 
+                  onClick={() => {
+                    setLoading(true);
+                    setTimeout(() => {
+                      setLoading(false);
+                      setOcrText("📁 檔案讀取成功：阿斯匹靈");
+                    }, 1000);
+                  }} 
                   className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition group"
                 >
                   <Plus className="text-gray-400 group-hover:text-blue-600 mb-2" size={24} />
                   <span className="text-xs font-bold text-gray-500 group-hover:text-blue-600">📁 上傳藥單檔案</span>
                 </button>
-                <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => {
-                  const isImage = e.target.files?.[0]?.type.startsWith('image/');
-                  setOcrText(isImage ? "📸 圖片辨識成功：阿斯匹靈" : "📁 檔案讀取成功：阿斯匹靈");
-                }} />
               </div>
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400">手動輸入或確認藥名</label>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    className="flex-1 border border-gray-200 rounded-lg px-4 py-2 text-sm" 
-                    placeholder="例如：阿斯匹靈" 
-                    value={ocrText.includes("：") ? ocrText.split("：")[1] : ""}
-                    onChange={(e) => setOcrText(`手動輸入：${e.target.value}`)}
-                  />
-                  <button 
-                    onClick={() => {
-                      setLoading(true);
-                      setTimeout(() => {
-                        setLoading(false);
-                        alert("🔍 藥物資料檢索成功：阿斯匹靈 (Aspirin)");
-                      }, 500);
-                    }}
-                    className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200 transition"
-                  >
-                    🔍 搜尋
-                  </button>
-                </div>
+                <input 
+                  type="text" 
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2 text-sm" 
+                  placeholder="例如：阿斯匹靈" 
+                  value={ocrText.includes("：") ? ocrText.split("：")[1] : ""}
+                  onChange={(e) => setOcrText(`手動輸入：${e.target.value}`)}
+                />
               </div>
 
               <button onClick={runAnalysis} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-100">
