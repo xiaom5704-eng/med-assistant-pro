@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
   Pill, LayoutDashboard, LogOut, Activity, Baby, History, Send, Camera, 
-  Plus, Trash2, AlertTriangle, Check, RefreshCw, MessageCircle, User, LogIn, UserPlus, X, FileText, Search
+  Plus, Trash2, AlertTriangle, Check, RefreshCw, MessageCircle, User, LogIn, UserPlus, X, FileText, Search, Info, ChevronRight, ChevronDown
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -30,6 +30,17 @@ interface Medication {
   type: "ocr" | "file" | "manual";
 }
 
+// --- 藥物資料庫 (模擬) ---
+const MED_DB: Record<string, { cn: string, purpose: string, ingredient: string, risk: string }> = {
+  "aspirin": { cn: "阿斯匹靈", purpose: "退燒、止痛、抗發炎", ingredient: "Acetylsalicylic acid", risk: "嬰兒使用可能導致瑞氏症候群 (Reye's syndrome)，極高風險。" },
+  "ibuprofen": { cn: "布洛芬", purpose: "緩解發燒與中度疼痛", ingredient: "Ibuprofen", risk: "與阿斯匹靈併用會增加胃出血風險。" },
+  "acetaminophen": { cn: "乙醯胺酚 (普拿疼)", purpose: "退燒、緩解輕微疼痛", ingredient: "Paracetamol", risk: "過量使用會造成肝臟損傷。" },
+  "amoxicillin": { cn: "阿莫西林 (抗生素)", purpose: "治療細菌感染", ingredient: "Amoxicillin", risk: "需按療程服用完畢，避免產生抗藥性。" },
+  "panadol": { cn: "普拿疼", purpose: "退燒、緩解疼痛", ingredient: "Paracetamol", risk: "過量使用會造成肝臟損傷。" },
+  "阿斯匹靈": { cn: "阿斯匹靈", purpose: "退燒、止痛、抗發炎", ingredient: "Acetylsalicylic acid", risk: "嬰兒使用可能導致瑞氏症候群 (Reye's syndrome)，極高風險。" },
+  "布洛芬": { cn: "布洛芬", purpose: "緩解發燒與中度疼痛", ingredient: "Ibuprofen", risk: "與阿斯匹靈併用會增加胃出血風險。" }
+};
+
 export const PasswordSettings: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -50,6 +61,7 @@ export const PasswordSettings: React.FC = () => {
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [reportMode, setReportMode] = useState<"simple" | "detail">("simple");
 
   // --- 嬰兒用藥狀態 ---
   const [babyAdvices, setBabyAdvices] = useState<BabyAdvice[]>([
@@ -108,7 +120,7 @@ export const PasswordSettings: React.FC = () => {
         canvasRef.current.height = videoRef.current.videoHeight;
         context.drawImage(videoRef.current, 0, 0);
         stopCamera();
-        addMedication("拍照辨識藥物", "ocr");
+        addMedication("Aspirin", "ocr");
       }
     }
   };
@@ -131,7 +143,6 @@ export const PasswordSettings: React.FC = () => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // 模擬從檔名辨識藥物
       const fileName = file.name.split(".")[0];
       addMedication(fileName, "file");
     }
@@ -155,24 +166,32 @@ export const PasswordSettings: React.FC = () => {
     }
     setLoading(true);
     setTimeout(() => {
-      const names = medications.map(m => m.name.toLowerCase());
-      let risk = "低";
-      let advice = "請按醫囑服用，注意藥物交互作用。";
+      const medDetails = medications.map(m => {
+        const key = m.name.toLowerCase();
+        return {
+          original: m.name,
+          ... (MED_DB[key] || { cn: m.name, purpose: "未知用途", ingredient: "未知成分", risk: "尚無資料" })
+        };
+      });
+
+      let riskLevel = "低";
+      let summary = "藥物組合相對安全，請按醫囑服用。";
       
-      // 模擬交互作用檢查
-      if (names.some(n => n.includes("阿斯匹靈")) && names.some(n => n.includes("布洛芬"))) {
-        risk = "高";
-        advice = "⚠️ 偵測到藥物相衝：阿斯匹靈與布洛芬併用會增加胃出血風險，請諮詢醫師。";
+      // 檢查交互作用
+      const names = medDetails.map(d => d.cn);
+      if (names.includes("阿斯匹靈") && names.includes("布洛芬")) {
+        riskLevel = "高";
+        summary = "⚠️ 偵測到藥物相衝：阿斯匹靈與布洛芬併用會增加胃出血風險，請諮詢醫師。";
       } else if (ageGroup === "infant") {
-        risk = "極高";
-        advice = "⚠️ 嬰兒用藥需極度謹慎，請務必諮詢醫師，嚴禁自行給藥。";
+        riskLevel = "極高";
+        summary = "⚠️ 嬰兒用藥需極度謹慎，請務必諮詢醫師，嚴禁自行給藥。";
       }
 
       setAnalysisResult({
         ageGroup: ageGroup === "infant" ? "嬰兒" : ageGroup === "elderly" ? "老年人" : "成年人",
-        risk,
-        advice,
-        meds: medications.map(m => m.name)
+        riskLevel,
+        summary,
+        medDetails
       });
       setLoading(false);
     }, 1200);
@@ -273,7 +292,7 @@ export const PasswordSettings: React.FC = () => {
                       <input 
                         type="text" 
                         className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm" 
-                        placeholder="手動輸入藥名..." 
+                        placeholder="手動輸入藥名 (如: Aspirin)..." 
                         value={manualInput}
                         onChange={(e) => setManualInput(e.target.value)}
                         onKeyPress={(e) => e.key === "Enter" && addMedication(manualInput, "manual")}
@@ -289,14 +308,56 @@ export const PasswordSettings: React.FC = () => {
                 開始 AI 深度分析
               </button>
             </div>
+
             {analysisResult && (
-              <div className={`p-5 rounded-2xl border space-y-3 animate-in fade-in slide-in-from-bottom-4 ${analysisResult.risk === "高" || analysisResult.risk === "極高" ? "bg-red-50 border-red-100" : "bg-green-50 border-green-100"}`}>
+              <div className={`p-5 rounded-2xl border space-y-4 animate-in fade-in slide-in-from-bottom-4 ${analysisResult.riskLevel === "高" || analysisResult.riskLevel === "極高" ? "bg-red-50 border-red-100" : "bg-green-50 border-green-100"}`}>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-gray-500 uppercase">分析報告 ({analysisResult.ageGroup})</span>
-                  <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${analysisResult.risk === "高" || analysisResult.risk === "極高" ? "bg-red-600 text-white" : "bg-green-600 text-white"}`}>風險：{analysisResult.risk}</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => setReportMode("simple")} className={`px-3 py-1 rounded-full text-[10px] font-bold transition ${reportMode === "simple" ? "bg-blue-600 text-white" : "bg-white text-gray-400 border border-gray-100"}`}>簡潔模式</button>
+                    <button onClick={() => setReportMode("detail")} className={`px-3 py-1 rounded-full text-[10px] font-bold transition ${reportMode === "detail" ? "bg-blue-600 text-white" : "bg-white text-gray-400 border border-gray-100"}`}>詳細模式</button>
+                  </div>
+                  <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${analysisResult.riskLevel === "高" || analysisResult.riskLevel === "極高" ? "bg-red-600 text-white" : "bg-green-600 text-white"}`}>風險：{analysisResult.riskLevel}</span>
                 </div>
-                <div className="text-sm font-bold text-gray-900 leading-relaxed">{analysisResult.advice}</div>
-                <div className="text-[10px] text-gray-400">分析藥物：{analysisResult.meds.join(", ")}</div>
+
+                {reportMode === "simple" ? (
+                  <div className="space-y-3">
+                    <div className="text-sm font-bold text-gray-900 leading-relaxed">{analysisResult.summary}</div>
+                    <div className="space-y-2">
+                      {analysisResult.medDetails.map((d: any, i: number) => (
+                        <div key={i} className="flex items-start gap-2 p-2 bg-white/50 rounded-lg">
+                          <Info size={14} className="text-blue-500 mt-0.5 shrink-0" />
+                          <div className="text-xs">
+                            <span className="font-bold text-blue-700">{d.cn}</span>：{d.purpose}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {analysisResult.medDetails.map((d: any, i: number) => (
+                      <div key={i} className="p-3 bg-white rounded-xl border border-gray-100 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-bold text-gray-900">{d.cn} <span className="text-[10px] text-gray-400 font-normal">({d.original})</span></span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[10px]">
+                          <div className="p-2 bg-gray-50 rounded">
+                            <div className="text-gray-400 mb-1">主要成分</div>
+                            <div className="font-bold text-gray-700">{d.ingredient}</div>
+                          </div>
+                          <div className="p-2 bg-gray-50 rounded">
+                            <div className="text-gray-400 mb-1">藥理作用</div>
+                            <div className="font-bold text-gray-700">{d.purpose}</div>
+                          </div>
+                        </div>
+                        <div className="p-2 bg-red-50 rounded text-[10px]">
+                          <div className="text-red-400 mb-1 font-bold">風險提示</div>
+                          <div className="text-red-700">{d.risk}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
