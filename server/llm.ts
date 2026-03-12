@@ -217,18 +217,17 @@ const resolveApiUrl = () => {
   const apiKey = getApiKey();
   const forgeApiUrl = process.env.BUILT_IN_FORGE_API_URL || process.env.FORGE_API_URL || "";
   
-  // 如果設定了自定義 URL，則使用它
+  let url = "";
   if (forgeApiUrl && forgeApiUrl.trim().length > 0) {
-    return `${forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`;
+    url = `${forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`;
+  } else if (apiKey.startsWith("AIza")) {
+    url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+  } else {
+    url = "https://api.openai.com/v1/chat/completions";
   }
   
-  // 如果金鑰是 Google Gemini 金鑰 (以 AIza 開頭)，則自動使用 Google 的 OpenAI 相容端點
-  if (apiKey.startsWith("AIza")) {
-    return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-  }
-  
-  // 預設使用 OpenAI 端點
-  return "https://api.openai.com/v1/chat/completions";
+  console.log(`[LLM] Resolved API URL: ${url}`);
+  return url;
 };
 
 const assertApiKey = () => {
@@ -289,6 +288,8 @@ const normalizeResponseFormat = ({
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   assertApiKey();
+  const apiKey = getApiKey();
+  console.log(`[LLM] Invoking LLM with API Key prefix: ${apiKey.substring(0, 8)}...`);
 
   const {
     messages,
@@ -302,7 +303,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } = params;
 
   const payload: Record<string, unknown> = {
-    model: "gemini-2.0-flash", // 使用更穩定的模型名稱
+    model: "gemini-2.0-flash",
     messages: messages.map(normalizeMessage),
   };
 

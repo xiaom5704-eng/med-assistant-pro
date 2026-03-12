@@ -260,6 +260,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // --- AI 藥物分析端點 (增強版) ---
     if (pathname.includes('/api/analyze-medication') && req.method === 'POST') {
       const { medications, ageGroup } = req.body;
+      console.log(`[API] Received analyze-medication request: medications=${JSON.stringify(medications)}, ageGroup=${ageGroup}`);
 
       if (!medications || medications.length === 0) {
         return res.status(400).json({ error: '請提供至少一種藥物' });
@@ -267,6 +268,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Use enhanced LLM analysis with fallback
       const analysisResult = await analyzeMedicationWithLLM(medications, ageGroup || "adult");
+      console.log(`[API] Analysis result: ${JSON.stringify(analysisResult).substring(0, 100)}...`);
 
       return res.status(200).json(analysisResult);
     }
