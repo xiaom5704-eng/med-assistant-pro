@@ -227,6 +227,10 @@ export const PasswordSettings: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setSymptomResult(data);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error:', response.status, errorData);
+        alert(`分析失敗 (${response.status}): ${errorData.error || '未知錯誤'}`);
       }
     } catch (error) {
       console.error(error);
@@ -252,6 +256,10 @@ export const PasswordSettings: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setAnalysisResult(data);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error:', response.status, errorData);
+        alert(`分析失敗 (${response.status}): ${errorData.error || '未知錯誤'}`);
       }
     } catch (error) {
       console.error(error);
