@@ -1,6 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
+import { invokeLLM, getFallbackAnalysis } from '../server/llm';
 
-// --- 高階 AI 藥物分析資料庫 ---
+// --- 高階 AI 藥物分析資料庫 (用於快速查詢) ---
 const ADVANCED_MED_DB: Record<string, any> = {
   "aspirin": {
     cn: "阿斯匹靈",
@@ -95,6 +96,41 @@ const ADVANCED_MED_DB: Record<string, any> = {
     ],
     tfda: "https://www.fda.gov.tw/",
     nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Acetaminophen"
+  },
+  "diclofenac": {
+    cn: "待克菲那 (非類固醇消炎藥)",
+    purpose: "緩解發炎與疼痛、退燒",
+    offLabel: "術後疼痛、腎絞痛、偏頭痛、痛風急性發作",
+    ingredient: "Diclofenac Sodium (雙氯芬酸鈉)",
+    mechanism: "強效的 COX 抑制劑，具有強大的抗發炎、鎮痛和解熱作用",
+    risk: "可能引起胃腸不適，需飯後服用；長期使用需監測腎功能；可能增加心血管風險",
+    riskLevel: "中",
+    infantRisk: "高",
+    dosage: "成人：50-100mg，每日1-2次；兒童：需醫師指示",
+    interactions: ["阿斯匹靈", "ACE 抑制劑", "利尿劑"],
+    literature: [
+      { title: "Diclofenac Safety in Pediatric Use", url: "https://pubmed.ncbi.nlm.nih.gov/" },
+      { title: "NSAID-Related Gastrointestinal Complications", url: "https://www.gastrojournal.org/" }
+    ],
+    tfda: "https://www.fda.gov.tw/",
+    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Diclofenac"
+  },
+  "mefenamic": {
+    cn: "博疏痛 (止痛藥)",
+    purpose: "緩解經痛與輕度疼痛",
+    offLabel: "術後疼痛、頭痛、牙痛",
+    ingredient: "Mefenamic Acid (甲芬那酸)",
+    mechanism: "非選擇性 COX 抑制劑，具有鎮痛和抗發炎效果",
+    risk: "氣喘患者需謹慎使用；可能引起胃腸不適；長期使用可能導致血液異常",
+    riskLevel: "中",
+    infantRisk: "高",
+    dosage: "成人：250mg，每6-8小時一次，每日不超過1000mg；兒童：需醫師指示",
+    interactions: ["阿斯匹靈", "華法林"],
+    literature: [
+      { title: "Mefenamic Acid in Pediatric Patients", url: "https://pubmed.ncbi.nlm.nih.gov/" }
+    ],
+    tfda: "https://www.fda.gov.tw/",
+    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Mefenamic"
   }
 };
 
@@ -135,7 +171,70 @@ const MEDICAL_LOCATIONS = [
   }
 ];
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
+/**
+ * Enhanced medication analysis using LLM with fallback to static DB
+ */
+async function analyzeMedicationWithLLM(
+  medications: string[],
+  ageGroup: string
+): Promise<Record<string, unknown>> {
+  try {
+    // Try to use LLM first
+    const apiKey = process.env.BUILT_IN_FORGE_API_KEY || process.env.OPENAI_API_KEY;
+    
+    if (apiKey) {
+      const systemPrompt = `You are a professional medical advisor specializing in medication safety analysis. 
+Based on the user's medications and medical history, provide:
+1. Detailed medication information (purpose, ingredients, mechanism)
+2. Possible drug interactions
+3. Risk assessment for different age groups
+4. When to seek professional medical help
+
+Always emphasize consulting with a healthcare professional. Respond in Traditional Chinese.`;
+
+      const userMessage = `
+Patient Age Group: ${ageGroup}
+Medications: ${medications.join(", ")}
+
+Please provide comprehensive medication analysis including:
+- Individual medication details
+- Interaction risks
+- Age-specific safety concerns
+- Recommended actions`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+      });
+
+      const content = response.choices[0]?.message?.content || "";
+      const analysisText = typeof content === "string" ? content : JSON.stringify(content);
+
+      // Parse LLM response
+      let analysisResult;
+      try {
+        analysisResult = JSON.parse(analysisText);
+      } catch {
+        analysisResult = { text: analysisText };
+      }
+
+      return {
+        success: true,
+        analysis: analysisResult,
+        usedLLM: true,
+      };
+    }
+  } catch (error) {
+    console.error("LLM analysis failed, falling back to static DB:", error);
+  }
+
+  // Fallback to static database
+  return getFallbackAnalysis(medications, ageGroup);
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 設定 CORS 標頭
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -158,7 +257,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
     }
 
-    // --- AI 藥物分析端點 ---
+    // --- AI 藥物分析端點 (增強版) ---
     if (pathname.includes('/api/analyze-medication') && req.method === 'POST') {
       const { medications, ageGroup } = req.body;
 
@@ -166,69 +265,10 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: '請提供至少一種藥物' });
       }
 
-      const medDetails = medications.map((medName: string) => {
-        const key = medName.toLowerCase();
-        const dbEntry = ADVANCED_MED_DB[key];
+      // Use enhanced LLM analysis with fallback
+      const analysisResult = await analyzeMedicationWithLLM(medications, ageGroup || "adult");
 
-        if (dbEntry) {
-          return { original: medName, ...dbEntry, found: true };
-        } else {
-          return {
-            original: medName,
-            cn: medName,
-            purpose: `根據藥名推測可能用於緩解症狀或治療相關疾病`,
-            offLabel: `建議查詢藥物仿單或諮詢醫師`,
-            ingredient: `${medName} 的活性成分`,
-            mechanism: `該藥物通過特定的生化機制發揮治療作用`,
-            risk: `使用前應諮詢醫師或藥師`,
-            riskLevel: "中",
-            infantRisk: ageGroup === "infant" ? "高" : "中",
-            dosage: `劑量應由醫師決定`,
-            interactions: [],
-            literature: [{ title: "PubMed 藥物資訊查詢", url: "https://pubmed.ncbi.nlm.nih.gov/" }],
-            tfda: "https://www.fda.gov.tw/",
-            nhi: `https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=${medName}`,
-            found: false
-          };
-        }
-      });
-
-      let riskLevel = "低";
-      let summary = "藥物組合相對安全，請按醫囑服用。";
-      let interactions: string[] = [];
-
-      for (let i = 0; i < medDetails.length; i++) {
-        for (let j = i + 1; j < medDetails.length; j++) {
-          const med1 = medDetails[i];
-          const med2 = medDetails[j];
-          if (med1.interactions && med1.interactions.includes(med2.cn)) {
-            interactions.push(`${med1.cn} 與 ${med2.cn} 可能存在交互作用`);
-            riskLevel = "高";
-          }
-        }
-      }
-
-      if (ageGroup === "infant") {
-        const infantRisks = medDetails.map((d: any) => d.infantRisk);
-        if (infantRisks.includes("極高")) {
-          riskLevel = "極高";
-          summary = "⚠️ 嚴重警告：此藥物組合對嬰兒極度危險，請務必諮詢醫師。";
-        } else if (infantRisks.includes("高")) {
-          riskLevel = "高";
-          summary = "⚠️ 注意：嬰兒用藥需謹慎，請務必諮詢醫師。";
-        }
-      } else if (interactions.length > 0) {
-        summary = `⚠️ 偵測到藥物相衝：${interactions.join('；')}，請立即諮詢醫師。`;
-      }
-
-      return res.status(200).json({
-        success: true,
-        ageGroup,
-        riskLevel,
-        summary,
-        interactions,
-        medDetails
-      });
+      return res.status(200).json(analysisResult);
     }
 
     // --- 醫療地點查詢端點 ---
