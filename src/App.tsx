@@ -69,7 +69,7 @@ const Home = () => {
         智慧用藥，守護健康
       </h1>
       <p className="text-lg text-gray-500 mb-10 max-w-xl mx-auto">
-        整合 AI 藥物分析、OCR 辨識與嬰兒用藥安全判斷，為您提供最專業的用藥建議。
+        整合症狀查藥、藥盒掃描分析與嬰兒用藥安全，為您提供最專業的家庭醫療輔助。
       </p>
       <div className="flex flex-col sm:flex-row justify-center gap-4">
         <button 
