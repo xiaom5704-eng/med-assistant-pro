@@ -95,41 +95,6 @@ const ADVANCED_MED_DB: Record<string, any> = {
     ],
     tfda: "https://www.fda.gov.tw/",
     nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Acetaminophen"
-  },
-  "diclofenac": {
-    cn: "待克菲那 (非類固醇消炎藥)",
-    purpose: "緩解發炎與疼痛、退燒",
-    offLabel: "術後疼痛、腎絞痛、偏頭痛、痛風急性發作",
-    ingredient: "Diclofenac Sodium (雙氯芬酸鈉)",
-    mechanism: "強效的 COX 抑制劑，具有強大的抗發炎、鎮痛和解熱作用",
-    risk: "可能引起胃腸不適，需飯後服用；長期使用需監測腎功能；可能增加心血管風險",
-    riskLevel: "中",
-    infantRisk: "高",
-    dosage: "成人：50-100mg，每日1-2次；兒童：需醫師指示",
-    interactions: ["阿斯匹靈", "ACE 抑制劑", "利尿劑"],
-    literature: [
-      { title: "Diclofenac Safety in Pediatric Use", url: "https://pubmed.ncbi.nlm.nih.gov/" },
-      { title: "NSAID-Related Gastrointestinal Complications", url: "https://www.gastrojournal.org/" }
-    ],
-    tfda: "https://www.fda.gov.tw/",
-    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Diclofenac"
-  },
-  "mefenamic": {
-    cn: "博疏痛 (止痛藥)",
-    purpose: "緩解經痛與輕度疼痛",
-    offLabel: "術後疼痛、頭痛、牙痛",
-    ingredient: "Mefenamic Acid (甲芬那酸)",
-    mechanism: "非選擇性 COX 抑制劑，具有鎮痛和抗發炎效果",
-    risk: "氣喘患者需謹慎使用；可能引起胃腸不適；長期使用可能導致血液異常",
-    riskLevel: "中",
-    infantRisk: "高",
-    dosage: "成人：250mg，每6-8小時一次，每日不超過1000mg；兒童：需醫師指示",
-    interactions: ["阿斯匹靈", "華法林"],
-    literature: [
-      { title: "Mefenamic Acid in Pediatric Patients", url: "https://pubmed.ncbi.nlm.nih.gov/" }
-    ],
-    tfda: "https://www.fda.gov.tw/",
-    nhi: "https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=Mefenamic"
   }
 };
 
@@ -167,39 +132,6 @@ const MEDICAL_LOCATIONS = [
     lat: 25.0340,
     lng: 121.5670,
     distance: 1.2
-  },
-  {
-    id: "clinic_002",
-    name: "小兒科專科診所",
-    type: "診所",
-    address: "台北市大安區信義路二段 100 號",
-    phone: "02-2345-6789",
-    hours: "週一至週五 10:00-19:00，週六 10:00-13:00",
-    lat: 25.0270,
-    lng: 121.5450,
-    distance: 2.1
-  },
-  {
-    id: "pharmacy_002",
-    name: "屈臣氏藥妝",
-    type: "藥局",
-    address: "台北市大安區忠孝東路四段 200 號",
-    phone: "02-2776-1111",
-    hours: "每日 10:00-21:30",
-    lat: 25.0280,
-    lng: 121.5460,
-    distance: 2.3
-  },
-  {
-    id: "hospital_002",
-    name: "國泰醫院",
-    type: "醫院",
-    address: "台北市信義區松仁路 77 號",
-    phone: "02-2708-1111",
-    hours: "24 小時急診",
-    lat: 25.0350,
-    lng: 121.5680,
-    distance: 1.5
   }
 ];
 
@@ -216,51 +148,44 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const { pathname } = new URL(req.url || '', 'http://localhost');
+  // 從 URL 中獲取路徑，相容不同的 Vercel 路由方式
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const pathname = url.pathname;
 
   try {
     // --- 健康檢查端點 ---
-    if (pathname === '/api/health') {
+    if (pathname.includes('/api/health')) {
       return res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
     }
 
     // --- AI 藥物分析端點 ---
-    if (pathname === '/api/analyze-medication' && req.method === 'POST') {
+    if (pathname.includes('/api/analyze-medication') && req.method === 'POST') {
       const { medications, ageGroup } = req.body;
 
       if (!medications || medications.length === 0) {
         return res.status(400).json({ error: '請提供至少一種藥物' });
       }
 
-      // 進行深度分析
       const medDetails = medications.map((medName: string) => {
         const key = medName.toLowerCase();
         const dbEntry = ADVANCED_MED_DB[key];
 
         if (dbEntry) {
-          return {
-            original: medName,
-            ...dbEntry,
-            found: true
-          };
+          return { original: medName, ...dbEntry, found: true };
         } else {
-          // 即使資料庫沒有，也生成智能分析（模擬 AI）
           return {
             original: medName,
             cn: medName,
             purpose: `根據藥名推測可能用於緩解症狀或治療相關疾病`,
-            offLabel: `可能存在其他臨床應用，建議查詢藥物仿單或諮詢醫師`,
+            offLabel: `建議查詢藥物仿單或諮詢醫師`,
             ingredient: `${medName} 的活性成分`,
-            mechanism: `該藥物通過特定的生化機制發揮治療作用，具體機制需查詢專業資料`,
-            risk: `使用任何藥物前應諮詢醫師或藥師，了解可能的副作用和禁忌`,
+            mechanism: `該藥物通過特定的生化機制發揮治療作用`,
+            risk: `使用前應諮詢醫師或藥師`,
             riskLevel: "中",
             infantRisk: ageGroup === "infant" ? "高" : "中",
-            dosage: `劑量應根據患者年齡、體重和臨床情況由醫師決定`,
+            dosage: `劑量應由醫師決定`,
             interactions: [],
-            literature: [
-              { title: "PubMed 藥物資訊查詢", url: "https://pubmed.ncbi.nlm.nih.gov/" },
-              { title: "FDA 藥物資料庫", url: "https://www.fda.gov/" }
-            ],
+            literature: [{ title: "PubMed 藥物資訊查詢", url: "https://pubmed.ncbi.nlm.nih.gov/" }],
             tfda: "https://www.fda.gov.tw/",
             nhi: `https://www.nhi.gov.tw/Query/query1.aspx?Q1ID=${medName}`,
             found: false
@@ -268,7 +193,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         }
       });
 
-      // 檢查藥物交互作用
       let riskLevel = "低";
       let summary = "藥物組合相對安全，請按醫囑服用。";
       let interactions: string[] = [];
@@ -277,7 +201,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         for (let j = i + 1; j < medDetails.length; j++) {
           const med1 = medDetails[i];
           const med2 = medDetails[j];
-          
           if (med1.interactions && med1.interactions.includes(med2.cn)) {
             interactions.push(`${med1.cn} 與 ${med2.cn} 可能存在交互作用`);
             riskLevel = "高";
@@ -285,18 +208,14 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // 針對嬰兒的特殊風險評估
       if (ageGroup === "infant") {
         const infantRisks = medDetails.map((d: any) => d.infantRisk);
         if (infantRisks.includes("極高")) {
           riskLevel = "極高";
-          summary = "⚠️ 嚴重警告：此藥物組合對嬰兒極度危險，請務必諮詢醫師，嚴禁自行給藥。";
+          summary = "⚠️ 嚴重警告：此藥物組合對嬰兒極度危險，請務必諮詢醫師。";
         } else if (infantRisks.includes("高")) {
           riskLevel = "高";
-          summary = "⚠️ 注意：嬰兒用藥需謹慎，請務必諮詢醫師並精確測量劑量。";
-        } else {
-          riskLevel = "中";
-          summary = "嬰兒用藥需特別注意，請按醫囑精確測量劑量。";
+          summary = "⚠️ 注意：嬰兒用藥需謹慎，請務必諮詢醫師。";
         }
       } else if (interactions.length > 0) {
         summary = `⚠️ 偵測到藥物相衝：${interactions.join('；')}，請立即諮詢醫師。`;
@@ -313,19 +232,13 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // --- 醫療地點查詢端點 ---
-    if (pathname === '/api/nearby-medical-locations' && req.method === 'GET') {
+    if (pathname.includes('/api/nearby-medical-locations') && req.method === 'GET') {
       const { type } = req.query;
-
       let results = MEDICAL_LOCATIONS;
-
-      // 按類型篩選
       if (type && type !== 'all') {
         results = results.filter(loc => loc.type === type);
       }
-
-      // 按距離排序
       results.sort((a, b) => a.distance - b.distance);
-
       return res.status(200).json({
         success: true,
         count: results.length,
@@ -334,7 +247,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // --- 404 處理 ---
-    return res.status(404).json({ error: 'Endpoint not found' });
+    return res.status(404).json({ error: `Endpoint not found: ${pathname}` });
 
   } catch (error) {
     console.error('API Error:', error);
