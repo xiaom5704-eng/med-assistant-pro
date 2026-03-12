@@ -214,14 +214,25 @@ const normalizeToolChoice = (
 };
 
 const resolveApiUrl = () => {
+  const apiKey = getApiKey();
   const forgeApiUrl = process.env.BUILT_IN_FORGE_API_URL || process.env.FORGE_API_URL || "";
-  return forgeApiUrl && forgeApiUrl.trim().length > 0
-    ? `${forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
+  
+  // 如果設定了自定義 URL，則使用它
+  if (forgeApiUrl && forgeApiUrl.trim().length > 0) {
+    return `${forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`;
+  }
+  
+  // 如果金鑰是 Google Gemini 金鑰 (以 AIza 開頭)，則自動使用 Google 的 OpenAI 相容端點
+  if (apiKey.startsWith("AIza")) {
+    return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+  }
+  
+  // 預設使用 OpenAI 端點
+  return "https://api.openai.com/v1/chat/completions";
 };
 
 const assertApiKey = () => {
-  const apiKey = process.env.BUILT_IN_FORGE_API_KEY || process.env.OPENAI_API_KEY || "";
+  const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY or BUILT_IN_FORGE_API_KEY is not configured");
   }
@@ -291,7 +302,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } = params;
 
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
+    model: "gemini-2.0-flash", // 使用更穩定的模型名稱
     messages: messages.map(normalizeMessage),
   };
 
@@ -307,10 +318,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768;
-  payload.thinking = {
-    budget_tokens: 128,
-  };
+  payload.max_tokens = 4096; // 調整為更通用的 max_tokens
 
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
